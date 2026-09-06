@@ -1,0 +1,72 @@
+# SehatSaathi — self-hosted deployment.
+#
+# The target server already runs nginx on 80/443 in front of ~20 other
+# services (mautic, authentik, keycloak, frappe, metabase, mattermost...),
+# so this stack does NOT try to own those ports. Caddy is gone; the existing
+# host nginx terminates TLS and proxies to the two loopback ports below.
+# See deploy/nginx-sehatsaathi.conf for the vhost.
+#
+# Nothing here binds to a public interface. Every published port is pinned to
+# 127.0.0.1, so the only way in is through the host nginx.
+#
+#   cd /opt/sehatsaathi && docker compose up -d --build
+
+services:
+  web:
+    build:
+      context: ./packages/web
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8100:80"
+    # The box has ~1.2 GiB actually available; cap the containers so a leak
+    # here cannot take down the other services sharing the host.
+    mem_limit: 256m
+    networks: [sehat]
+
+  api:
+    build:
+      context: ./packages/api
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8101:3000"
+    env_file: [.env]
+    volumes:
+      - sehat_data:/app/data      # cached safety-phrase audio clips
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+    depends_on:
+      db:
+        condition: service_healthy
+    mem_limit: 512m
+    networks: [sehat]
+
+  db:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    # 5432 is already used by three other containers on this host; ours stays
+    # on the internal network and is reachable from the host on 5433 only.
+    ports:
+      - "127.0.0.1:5433:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - sehat_pgdata:/var/lib/postgresql/data
+      - ./packages/api/src/db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      # api must not start before the schema is applied, or migrations race
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    mem_limit: 512m
+    networks: [sehat]
+
+volumes:
+  sehat_pgdata:
+  sehat_data:
+
+networks:
+  sehat:
+    driver: bridge

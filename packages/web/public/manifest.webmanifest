@@ -1,0 +1,19 @@
+{
+  "name": "SehatSaathi",
+  "short_name": "SehatSaathi",
+  "description": "Voice-first Urdu diabetes companion",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0d1b2a",
+  "theme_color": "#0d1b2a",
+  "dir": "rtl",
+  "lang": "ur",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

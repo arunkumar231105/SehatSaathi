@@ -1,0 +1,16 @@
+node_modules/
+dist/
+build/
+.env
+.env.local
+*.log
+.DS_Store
+caddy_data/
+caddy_config/
+pgdata/
+*.wav
+!seed/audio/*.wav
+.vite/
+coverage/
+*.tsbuildinfo
+scratch/
