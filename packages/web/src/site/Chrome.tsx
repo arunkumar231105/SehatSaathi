@@ -3,6 +3,7 @@ import { Link } from '../router.tsx';
 
 const LINKS = [
   { h: '/#how', t: 'How it works' },
+  { h: '/#listen', t: 'Listen' },
   { h: '/#memory', t: 'Memory' },
   { h: '/#safety', t: 'Safety' },
   { h: '/#caregivers', t: 'Caregivers' },
@@ -48,7 +49,7 @@ export function Footer() {
         </div>
         <div>
           <b>Product</b>
-          <a href="/#how">How it works</a><a href="/#memory">Memory</a><a href="/#safety">Safety</a>
+          <a href="/#how">How it works</a><a href="/#memory">Memory</a><a href="/#safety">Safety</a><a href="/#privacy">Privacy</a>
           <Link to="/app">Web demo</Link><Link to="/care">Caregiver dashboard</Link>
         </div>
         <div>

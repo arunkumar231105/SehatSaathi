@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from '../router.tsx';
 
 interface WaStatus { configured: boolean; number?: string | null }
@@ -86,6 +86,43 @@ export default function Landing() {
         </div>
       </section>
 
+      {/* ── Hear it ──────────────────────────────────────────────────── */}
+      <section className="section" id="listen">
+        <div className="wrap">
+          <span className="eyebrow">Listen</span>
+          <h2>This is what a patient actually hears.</h2>
+          <p className="lead narrow">
+            Real audio from the running system — not a recording of a person. Azure’s <code>ur-PK</code> neural voice,
+            the same one that answers on WhatsApp.
+          </p>
+          <div className="clips">
+            <Clip
+              src="/audio/memory.mp3"
+              label="The day-14 follow-up"
+              ur="السلام علیکم راشدہ بی بی! پچھلے ہفتے آپ نے بتایا تھا کہ پاؤں سن ہو رہا ہے۔ اب کیسا ہے؟ اور آپ کی صبح کی شوگر پانچ دن سے بڑھ رہی ہے۔"
+              en="Hello Rashida Bibi! Last week you said your foot was going numb — how is it now? And your morning sugar has been rising for five days."
+            />
+            <Clip
+              src="/audio/high.mp3"
+              label="A high reading after biryani"
+              ur="آپ نے بتایا شوگر دو سو پچاس۔ یہ زیادہ ہے۔ بریانی کے بعد شوگر بڑھ جاتی ہے، تھوڑی مقدار لیں اور کھانے کے بعد چہل قدمی کریں۔"
+              en="You said 250. That is high. Sugar rises after biryani — take a smaller portion and walk after eating."
+            />
+            <Clip
+              src="/audio/hypo.mp3"
+              label="Emergency — low sugar"
+              ur="آپ کی شوگر بہت کم ہے۔ ابھی فوراً تین چمچ چینی یا آدھا گلاس میٹھا جوس لیں، پھر پندرہ منٹ بعد دوبارہ شوگر چیک کریں۔"
+              en="Your sugar is very low. Take three spoons of sugar or half a glass of sweet juice right now, then check again after fifteen minutes."
+              danger
+            />
+          </div>
+          <p className="fine">
+            The emergency clip is pre-recorded and cached on the server — it plays even if the speech service is down,
+            because an emergency instruction must never depend on a network call.
+          </p>
+        </div>
+      </section>
+
       {/* ── Memory ───────────────────────────────────────────────────── */}
       <section className="section" id="memory">
         <div className="wrap">
@@ -150,6 +187,49 @@ export default function Landing() {
         </div>
       </section>
 
+      {/* ── Screens ──────────────────────────────────────────────────── */}
+      <section className="section section--tint" id="screens">
+        <div className="wrap">
+          <span className="eyebrow">The app</span>
+          <h2>For patients who prefer a screen.</h2>
+          <p className="lead narrow">
+            The same companion, the same memory, as an installable web app — one big button, right-to-left Urdu,
+            and nothing to read that isn’t essential.
+          </p>
+          <div className="screens">
+            <Shot src="/shots/talk.png" t="Hold and speak" d="One button. No menus, no typing, no forms." />
+            <Shot src="/shots/memory.png" t="What I know about you" d="Every fact, with the sentence it was learned from — and what it still wants to ask." />
+            <Shot src="/shots/timeline.png" t="Your record" d="Readings, meals, medicines and symptoms in one colour-coded history." />
+          </div>
+          <Link className="btn btn--outline" to="/app">Open the web app</Link>
+        </div>
+      </section>
+
+      {/* ── Who it's for ─────────────────────────────────────────────── */}
+      <section className="section" id="who">
+        <div className="wrap">
+          <span className="eyebrow">Who it is for</span>
+          <h2>Three people, one thread of care.</h2>
+          <div className="who">
+            <Who
+              icon="🧕"
+              t="The patient"
+              d="Speaks Urdu, may not read well, sees a doctor rarely. Gets spoken guidance grounded in their own history, and is told plainly when something needs a doctor today."
+            />
+            <Who
+              icon="👨"
+              t="The family member"
+              d="Usually the one who notices something is wrong. Gets an alert the moment a dangerous reading is logged, with the patient's own words and a one-tap way to reach them."
+            />
+            <Who
+              icon="🩺"
+              t="The clinician"
+              d="Sees a structured English summary instead of a vague history: time-in-range, morning trends, adherence, and which foods precede spikes — in the minutes an appointment actually lasts."
+            />
+          </div>
+        </div>
+      </section>
+
       {/* ── Caregivers ───────────────────────────────────────────────── */}
       <section className="section" id="caregivers">
         <div className="wrap two">
@@ -198,6 +278,29 @@ export default function Landing() {
             listeners and it was not intelligible, so speech runs on providers with genuine Pakistani Urdu support while
             Qwen powers everything that makes this a memory agent.
           </p>
+        </div>
+      </section>
+
+      {/* ── Privacy ──────────────────────────────────────────────────── */}
+      <section className="section" id="privacy">
+        <div className="wrap two">
+          <div>
+            <span className="eyebrow">Privacy</span>
+            <h2>Health data deserves more care than most apps give it.</h2>
+            <p className="lead">
+              People tell this system things they have not told their doctor. That is only reasonable if the data is
+              treated properly, so here is exactly what happens to it.
+            </p>
+          </div>
+          <div className="prose">
+            <ul className="ticks">
+              <li>Stored on a single server the project controls, in Pakistan-accessible infrastructure — not sold, not shared with advertisers, not used to train any model.</li>
+              <li>Seen only by the patient and the one family contact they name for emergencies.</li>
+              <li>Provider keys never reach the browser or the phone; the app talks only to our server.</li>
+              <li>Conversations are kept because the memory is the product — a companion that forgets is just a chatbot. A patient can ask for their record to be deleted at any time.</li>
+              <li>The source code is open, so these claims can be checked rather than trusted.</li>
+            </ul>
+          </div>
         </div>
       </section>
 
@@ -253,6 +356,45 @@ export default function Landing() {
 
 function Stat({ n, l }: { n: string; l: string }) {
   return <div className="stat"><div className="stat__n">{n}</div><div className="stat__l">{l}</div></div>;
+}
+
+/** Play button + the words, so the clip is understandable without sound too. */
+function Clip({ src, label, ur, en, danger }: { src: string; label: string; ur: string; en: string; danger?: boolean }) {
+  const audio = useRef<HTMLAudioElement>(null);
+  const [playing, setPlaying] = useState(false);
+  const toggle = () => {
+    const el = audio.current;
+    if (!el) return;
+    if (playing) { el.pause(); el.currentTime = 0; setPlaying(false); return; }
+    // Only one clip at a time.
+    document.querySelectorAll('audio').forEach((a) => { a.pause(); a.currentTime = 0; });
+    void el.play();
+    setPlaying(true);
+  };
+  return (
+    <div className={`clip ${danger ? 'clip--danger' : ''}`}>
+      <button className="clip__btn" onClick={toggle} aria-label={`play ${label}`}>{playing ? '■' : '▶'}</button>
+      <div className="clip__body">
+        <div className="clip__label">{label}</div>
+        <div className="clip__ur" dir="rtl" lang="ur">{ur}</div>
+        <div className="clip__en">{en}</div>
+      </div>
+      <audio ref={audio} src={src} preload="none" onEnded={() => setPlaying(false)} />
+    </div>
+  );
+}
+
+function Shot({ src, t, d }: { src: string; t: string; d: string }) {
+  return (
+    <figure className="shot">
+      <img src={src} alt={t} loading="lazy" width="400" height="860" />
+      <figcaption><b>{t}</b><span>{d}</span></figcaption>
+    </figure>
+  );
+}
+
+function Who({ icon, t, d }: { icon: string; t: string; d: string }) {
+  return <div className="whocard"><div className="whocard__i">{icon}</div><h3>{t}</h3><p>{d}</p></div>;
 }
 function Step({ n, t, d }: { n: string; t: string; d: string }) {
   return <div className="step"><div className="step__n">{n}</div><h3>{t}</h3><p>{d}</p></div>;

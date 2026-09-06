@@ -311,3 +311,37 @@ circle.dot { stroke: #fff; stroke-width: 1.5; }
 .checks .label em, .checks .label code { font-style: normal; font-size: .8rem; color: var(--muted); }
 .checks .label code { color: var(--danger); word-break: break-word; }
 .checks li[data-state='pass'] .label code { color: var(--ok); }
+
+/* ── listen: audio clips ─────────────────────────────────────────────── */
+.clips { display: grid; gap: .8rem; margin: 1.6rem 0 1rem; }
+.clip { display: flex; gap: 1rem; align-items: flex-start; background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 1rem 1.1rem; }
+.clip--danger { border-color: var(--danger); background: #fffafa; }
+.clip__btn { flex: none; width: 46px; height: 46px; border-radius: 50%; border: 0; background: var(--teal); color: #fff; font-size: 1rem; cursor: pointer; display: grid; place-items: center; }
+.clip--danger .clip__btn { background: var(--danger); }
+.clip__btn:hover { filter: brightness(1.08); }
+.clip__label { font-weight: 700; font-size: .9rem; color: var(--teal); margin-bottom: .2rem; }
+.clip--danger .clip__label { color: var(--danger); }
+.clip__ur { font-family: var(--urdu); font-size: 1.05rem; line-height: 2.1; }
+.clip__en { color: var(--muted); font-size: .9rem; margin-top: .2rem; }
+code { background: var(--bg-tint); padding: .05rem .35rem; border-radius: 5px; font-size: .9em; }
+
+/* ── screenshots ─────────────────────────────────────────────────────── */
+.screens { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.4rem; margin: 1.8rem 0 1.4rem; }
+.shot { margin: 0; }
+.shot img { width: 100%; height: auto; border-radius: 18px; border: 1px solid var(--line); box-shadow: var(--shadow); display: block; background: #fff; }
+.shot figcaption { margin-top: .7rem; display: grid; gap: .15rem; }
+.shot figcaption b { font-size: 1rem; }
+.shot figcaption span { color: var(--ink-2); font-size: .92rem; }
+@media (max-width: 800px) { .screens { grid-template-columns: 1fr; max-width: 24rem; margin-inline: auto; } }
+
+/* ── who it's for ────────────────────────────────────────────────────── */
+.who { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-top: 1.6rem; }
+.whocard { background: var(--bg-tint); border-radius: var(--radius); padding: 1.4rem; }
+.whocard__i { font-size: 2rem; line-height: 1; margin-bottom: .5rem; }
+.whocard p { color: var(--ink-2); font-size: .95rem; margin: 0; }
+@media (max-width: 800px) { .who { grid-template-columns: 1fr; } }
+
+/* ── privacy ticks ───────────────────────────────────────────────────── */
+.ticks { list-style: none; padding: 0; margin: 0; }
+.ticks li { position: relative; padding-inline-start: 1.8rem; margin-bottom: .7rem; color: var(--ink-2); }
+.ticks li::before { content: '✓'; position: absolute; inset-inline-start: 0; color: var(--teal); font-weight: 700; }
