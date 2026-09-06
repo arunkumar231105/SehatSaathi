@@ -18,7 +18,7 @@
 import { q, one } from '../db/client.ts';
 import { transcribeFile } from '../voice/groq-asr.ts';
 import { speakUrduOgg } from '../voice/azure-tts.ts';
-import { respond, ensureSession, greeting } from '../orchestrator/turn.ts';
+import { respond, ensureSession, greeting, actionPlan } from '../orchestrator/turn.ts';
 import { phrase } from '../safety/phrases.ts';
 
 const GRAPH = 'https://graph.facebook.com/v21.0';
@@ -151,6 +151,16 @@ async function handleMessage(m: WaMessage, profileName?: string): Promise<void> 
 
     if (!textUr || textUr.length < 2) {
       await sendText(m.from, phrase('didnt_catch').ur);
+      return;
+    }
+
+    // "plan" / "منصوبہ" returns the full weekly plan rather than a
+    // conversational turn — patients ask for it explicitly once they know
+    // it exists, and it is the most useful single message we send.
+    if (/^(plan|my plan|منصوبہ|پلان)\b/i.test(textUr.trim())) {
+      const { text } = await actionPlan(patientId, 'ur');
+      await sendText(m.from, text);
+      await sendVoice(m.from, text);
       return;
     }
 

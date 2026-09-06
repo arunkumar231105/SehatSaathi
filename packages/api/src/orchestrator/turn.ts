@@ -22,6 +22,7 @@ import {
 } from '../memory/engine.ts';
 import { extractProfile } from '../memory/extractor.ts';
 import { retrieve } from '../rag/kb.ts';
+import { buildPlan, planToText, type PlanAction } from './plan.ts';
 import { bus } from '../bus.ts';
 
 export type Channel = 'web' | 'whatsapp' | 'api';
@@ -267,6 +268,10 @@ MEDICINES — you educate, you never prescribe.
 - You MUST NOT: name a medicine they should start, suggest changing or stopping any dose, or say one medicine is better than another. That decision needs blood tests and belongs to their doctor.
 - When asked "which tablet should I take" or "should I increase the dose", say warmly that this is the doctor's decision, explain WHY it needs their tests, and offer to help them prepare the question for the doctor. Never leave them with nothing — always give something useful they can do today.
 
+NUMBERS — never state a threshold the patient did not cross. If they said 220, do not say "since your sugar is above 250". Quote only the number they actually gave, and the numbers from their record below. Getting this wrong makes the advice confusing and untrustworthy.
+
+BE USEFUL, NOT VAGUE. Every reply must leave them something concrete to do today — a portion size, a walk after a named meal, a time to eat dinner, a check to run tomorrow morning. "See your doctor" on its own is not an answer; pair it with what to do in the meantime. The action plan below is built from this patient's own readings — draw your advice from it.
+
 Answering well:
 - Normal reply: 2-3 short sentences. When they ask a genuine question (about food, a medicine, feet, Ramzan, checking sugar), give a fuller, genuinely useful answer of up to 5 sentences with something concrete they can act on.
 - If the patient gave a number, repeat it back first so they can correct you.
@@ -340,6 +345,20 @@ async function generateReply(a: {
   );
 
   ctx.push('Clinical picture:\n- ' + describeFeatures(a.features).join('\n- '));
+
+  // Deterministic, data-driven actions. The model may phrase these warmly but
+  // must not invent additions — this is what keeps advice concrete and still
+  // grounded in the patient's own record.
+  const plan = buildPlan(a.features, a.facts);
+  if (plan.length) {
+    ctx.push(
+      "THIS PATIENT'S ACTION PLAN (generated from their own readings — draw concrete advice from it, do not invent extra items):\n- " +
+        plan
+          .slice(0, 5)
+          .map((x) => (a.lang === 'en' ? `${x.doEn}  [because: ${x.becauseEn}]` : `${x.doUr}  [وجہ: ${x.becauseUr}]`))
+          .join('\n- '),
+    );
+  }
   if (concerns.length) ctx.push('Open concerns to follow up (ask about at most one):\n- ' + concerns.map((c) => c.summary_ur + (c.summary_en ? ` (${c.summary_en})` : '')).join('\n- '));
   if (episodes.length) ctx.push('Relevant earlier things the patient said:\n- ' + episodes.map((e) => e.text_ur).join('\n- '));
   if (refs.length) {
@@ -477,6 +496,16 @@ async function afterTurn(a: {
 function patientLine(c: Concern): string {
   const p = (c.detail as { en_patient?: string } | null)?.en_patient;
   return p ?? c.summary_en ?? c.summary_ur;
+}
+
+/** The full weekly plan for a patient, as spoken text plus structured actions. */
+export async function actionPlan(
+  patientId: string,
+  lang: Lang = 'ur',
+): Promise<{ text: string; actions: PlanAction[] }> {
+  const [facts, features] = await Promise.all([getProfile(patientId), longitudinal(patientId)]);
+  const actions = buildPlan(features, facts);
+  return { text: planToText(actions, lang), actions };
 }
 
 export async function greeting(patientId: string, lang: Lang = 'ur'): Promise<{ textUr: string; concerns: Concern[] }> {

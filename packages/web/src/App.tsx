@@ -5,6 +5,7 @@ import Landing from './site/Landing.tsx';
 import Talk from './screens/Talk.tsx';
 import Timeline from './screens/Timeline.tsx';
 import Memory from './screens/Memory.tsx';
+import Plan from './screens/Plan.tsx';
 import Care from './screens/Care.tsx';
 import Preflight from './screens/Preflight.tsx';
 import { getPatientId, get, getLang, setLang } from './api.ts';
@@ -12,6 +13,7 @@ import { t, dir } from './i18n.ts';
 
 const APP_NAV = (s: ReturnType<typeof t>) => [
   { p: '/app', label: s.tabTalk, icon: '🎤' },
+  { p: '/app/plan', label: s.tabPlan, icon: '✅' },
   { p: '/app/timeline', label: s.tabRecord, icon: '📈' },
   { p: '/app/memory', label: s.tabMemory, icon: '🧠' },
 ];
@@ -42,6 +44,7 @@ export default function App() {
   else if (path === '/preflight') body = <Preflight />;
   else if (inApp) {
     if (!pid) body = <div className="loading">…</div>;
+    else if (path === '/app/plan') body = <Plan patientId={pid} />;
     else if (path === '/app/timeline') body = <Timeline patientId={pid} />;
     else if (path === '/app/memory') body = <Memory patientId={pid} onPatientChange={setPid} />;
     else body = <Talk patientId={pid} caregiverPhone={caregiverPhone} />;

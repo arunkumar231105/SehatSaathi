@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { q, one } from '../db/client.ts';
-import { respond, ensureSession, greeting } from '../orchestrator/turn.ts';
+import { respond, ensureSession, greeting, actionPlan } from '../orchestrator/turn.ts';
 import { getProfile, longitudinal, openConcerns, resolveConcern } from '../memory/engine.ts';
 import { speakUrdu, URDU_VOICES } from '../voice/azure-tts.ts';
 import { bus, type AlertEvent } from '../bus.ts';
@@ -75,6 +75,12 @@ export async function apiRoutes(app: FastifyInstance): Promise<void> {
     await resolveConcern(req.params.id);
     return { ok: true };
   });
+
+  /** A concrete weekly plan built from this patient's own readings. */
+  app.get<{ Params: { id: string }; Querystring: { lang?: 'ur' | 'en' } }>(
+    '/api/patients/:id/plan',
+    async (req) => actionPlan(req.params.id, req.query.lang ?? 'ur'),
+  );
 
   /** Memory-driven opening line for today. */
   app.get<{ Params: { id: string }; Querystring: { lang?: 'ur' | 'en' } }>('/api/patients/:id/greeting', async (req) => {

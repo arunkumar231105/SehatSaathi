@@ -348,3 +348,17 @@ code { background: var(--bg-tint); padding: .05rem .35rem; border-radius: 5px; f
 .app--patient.app--en .fact__meta { justify-content: flex-start; }
 .app--patient.app--en .bubble--patient { align-self: flex-end; border-radius: 1.1rem 1.1rem .3rem 1.1rem; }
 .app--patient.app--en .bubble--agent { align-self: flex-start; border-radius: 1.1rem 1.1rem 1.1rem .3rem; }
+
+/* ── weekly plan ─────────────────────────────────────────────────────── */
+.act { display: flex; gap: .8rem; align-items: flex-start; background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: .7rem .9rem; margin: .55rem 0; }
+.act--done { opacity: .55; background: var(--bg-tint); }
+.act--done .act__do { text-decoration: line-through; }
+.act__tick { flex: none; width: 2rem; height: 2rem; border-radius: 50%; border: 2px solid var(--line); background: #fff; color: var(--teal); font-size: 1rem; font-weight: 700; cursor: pointer; display: grid; place-items: center; font-family: var(--font); }
+.act--done .act__tick { background: var(--teal); border-color: var(--teal); color: #fff; }
+.act__body { flex: 1; min-width: 0; }
+.act__tag { display: inline-flex; align-items: center; gap: .3rem; font-size: .78rem; font-weight: 700; color: var(--teal); background: var(--teal-soft); border-radius: .4rem; padding: 0 .5rem; margin-bottom: .2rem; }
+.act__i { font-size: .95rem; }
+.act__do { font-size: 1.05rem; line-height: 1.9; }
+.act__why { font-size: .85rem; color: var(--muted); line-height: 1.7; margin-top: .15rem; }
+.app--patient.app--en .act__do, .app--patient.app--en .act__why, .app--patient.app--en .act__tag { font-family: var(--font); line-height: 1.5; }
+.tabs { grid-template-columns: repeat(4, 1fr); }
