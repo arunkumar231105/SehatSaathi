@@ -81,6 +81,20 @@ function fact(facts: ProfileFact[], key: string): unknown {
   return facts.find((f) => f.key === key)?.value;
 }
 
+/**
+ * Is this actually Urdu script rather than Roman Urdu?
+ *
+ * Latin characters are legitimate in an Urdu reply — drug and brand names
+ * (Metformin, Glucophage) and numbers appear constantly — so the test is a
+ * ratio over letters only, not the presence of any Latin at all.
+ */
+function isUrduScript(text: string): boolean {
+  const arabic = (text.match(/[؀-ۿ]/g) ?? []).length;
+  const latin = (text.match(/[A-Za-z]/g) ?? []).length;
+  if (arabic + latin === 0) return false;
+  return arabic / (arabic + latin) > 0.5;
+}
+
 function readback(ex: Extraction): string {
   if (ex.glucose_mg_dl === null) return '';
   const ctx =
@@ -218,16 +232,28 @@ async function insertAlert(patientId: string, turnId: string, f: Finding): Promi
   return row!.id;
 }
 
-const PERSONA = `You are صحت ساتھی (SehatSaathi), a warm, patient health companion for a diabetes patient in Pakistan who may not read well. You speak SIMPLE spoken Urdu, like a caring family nurse — never clinical jargon, never English sentences (drug names are fine).
+const PERSONA = `You are صحت ساتھی (SehatSaathi), a warm, knowledgeable health companion for a diabetes patient in Pakistan who may not read well. You speak SIMPLE spoken Urdu, like an experienced, kind family nurse — never clinical jargon, never English sentences (drug and brand names in English are fine).
 
-Hard rules:
-- Maximum 3 short sentences. This is spoken aloud; long replies are not heard.
+NEVER INVENT ANYTHING ABOUT THIS PATIENT.
+- Only state a medicine, condition, habit or family member that appears in the profile or clinical picture below, or that the patient just said.
+- If they ask about something not in their profile (for example insulin when no insulin is recorded), answer generally — "jo log insulin lagate hain unhen…" — or ask whether they take it. Never say "the insulin you take" unless it is recorded.
+- If you do not know something about them, ask instead of assuming.
+
+MEDICINES — you educate, you never prescribe.
+- You MAY explain in detail: what a medicine they already take does, when to take it, why with food, common side effects, what to do about one missed dose, how to store insulin, and which of their medicines can cause a low.
+- You MUST NOT: name a medicine they should start, suggest changing or stopping any dose, or say one medicine is better than another. That decision needs blood tests and belongs to their doctor.
+- When asked "which tablet should I take" or "should I increase the dose", say warmly that this is the doctor's decision, explain WHY it needs their tests, and offer to help them prepare the question for the doctor. Never leave them with nothing — always give something useful they can do today.
+
+Answering well:
+- Normal reply: 2-3 short sentences. When they ask a genuine question (about food, a medicine, feet, Ramzan, checking sugar), give a fuller, genuinely useful answer of up to 5 sentences with something concrete they can act on.
 - If the patient gave a number, repeat it back first so they can correct you.
-- Never prescribe, never change or suggest a dose, never tell them to stop a medicine, never diagnose. If asked, say warmly that this is the doctor's decision and offer to help them raise it.
-- Use what you know about them (below). If there is an open concern from earlier, ask about it naturally in ONE sentence when relevant.
-- Ground advice in the reference notes provided. Do not invent facts.
-- End with one practical step or one gentle question.
-- Output plain Urdu text only. No lists, no markdown, no emojis.`;
+- Ground every clinical statement in the reference notes below. If the notes do not cover it, say plainly that you are not sure and suggest asking the doctor.
+- Use what you know about them: their food habits, how many rotis, their medicines, whether they fast.
+- If there is an open concern from earlier, ask about it in ONE sentence when it fits naturally. Do not force it into every reply.
+- Vary how you close. Do not end every message by offering to tell a family member — do that only when it genuinely matters.
+
+SCRIPT — this is critical. Always write in Urdu script (اردو رسم الخط), never Roman Urdu, even if the patient writes to you in Roman letters. Your reply is read aloud by an Urdu text-to-speech voice: Roman letters are pronounced as English and come out as noise the patient cannot understand.
+- Output plain spoken Urdu only. No lists, no markdown, no emojis, no headings.`;
 
 async function generateReply(a: {
   userTextUr: string;
@@ -238,34 +264,101 @@ async function generateReply(a: {
   name?: string;
   amber: Finding[];
 }): Promise<string> {
+  // Questions deserve more reference material and more room to answer.
+  const isQuestion = a.extraction.intent === 'question';
   const [episodes, history, concerns, refs] = await Promise.all([
     recallEpisodes(a.patientId, a.userTextUr, 4),
     recentTurns(a.patientId, 6),
     dueConcerns(a.patientId),
-    retrieve(`${a.extraction.notes_en} ${a.userTextUr}`, 3),
+    retrieve(`${a.extraction.notes_en} ${a.userTextUr}`, isQuestion ? 5 : 3),
   ]);
 
   const ctx: string[] = [];
-  if (a.name) ctx.push(`Patient name: ${a.name}`);
-  const prof = describeProfile(a.facts);
-  if (prof.length) ctx.push('Profile:\n- ' + prof.join('\n- '));
+
+  // Identity, stated unambiguously. A flat key/value dump let the model read
+  // "caregiver: Bilal (son)" as the patient's own name and address a
+  // 58-year-old woman as her son.
+  const val = (k: string) => a.facts.find((f) => f.key === k)?.value;
+  const caregiver = val('caregiver');
+  ctx.push(
+    `WHO YOU ARE TALKING TO — the patient is ${a.name ?? 'unknown name'}. Address ONLY them.` +
+      (caregiver
+        ? `\nThe patient's family contact is ${typeof caregiver === 'string' ? caregiver : JSON.stringify(caregiver)}. That is a DIFFERENT person who is NOT in this conversation — never greet or address them, only refer to them in the third person.`
+        : ''),
+  );
+
+  // Medicines as a closed list. This is the fact the model most often invents.
+  const meds = val('medications');
+  const medList = Array.isArray(meds) ? meds : meds ? [String(meds)] : [];
+  ctx.push(
+    medList.length
+      ? `MEDICINES THIS PATIENT TAKES (complete list — they take NOTHING else):\n- ${medList.join('\n- ')}\nIf asked about any medicine not on this list (insulin, or any other), do NOT say "the one you take". Either answer generally about people who use it, or ask whether they use it.`
+      : 'MEDICINES: none recorded. Do not refer to any medicine as one they take; ask what they have been prescribed.',
+  );
+
+  const other = describeProfile(a.facts.filter((f) => !['name', 'caregiver', 'medications'].includes(f.key)));
+  ctx.push(
+    other.length
+      ? `Other known facts — this is EVERYTHING else known. Anything not listed is UNKNOWN, not absent:\n- ${other.join('\n- ')}`
+      : 'Nothing else is known about this patient. Do not assume any habit, condition or family member.',
+  );
+
   ctx.push('Clinical picture:\n- ' + describeFeatures(a.features).join('\n- '));
   if (concerns.length) ctx.push('Open concerns to follow up (ask about at most one):\n- ' + concerns.map((c) => c.summary_ur + (c.summary_en ? ` (${c.summary_en})` : '')).join('\n- '));
   if (episodes.length) ctx.push('Relevant earlier things the patient said:\n- ' + episodes.map((e) => e.text_ur).join('\n- '));
-  if (refs.length) ctx.push('Reference notes:\n- ' + refs.map((r) => `${r.title}: ${r.content}`).join('\n- '));
+  if (refs.length) {
+    ctx.push(
+      'REFERENCE NOTES — general medical information, NOT statements about this patient. ' +
+        'Use them to answer accurately, but never assume the patient has a condition or takes a medicine just because it appears here:\n- ' +
+        refs.map((r) => `${r.title}: ${r.content}`).join('\n- '),
+    );
+  }
   if (a.amber.length) ctx.push('Rules engine flagged (include the advice, calmly): ' + a.amber.map((f) => f.reasonUr).join(' '));
   ctx.push(`Extracted from this turn: ${JSON.stringify({ glucose: a.extraction.glucose_mg_dl, context: a.extraction.glucose_context, symptoms: a.extraction.symptoms, meals: a.extraction.meals.map((m) => m.items).flat(), medication: a.extraction.medication, intent: a.extraction.intent })}`);
+
+  // A last-position reminder. Instructions at the end of the prompt are
+  // followed far more reliably by this model than the same words buried in a
+  // long system block — and the two failures that mattered (wrong person,
+  // invented medicine) are exactly the ones worth repeating here.
+  const guard =
+    `[Reply to ${a.name ?? 'the patient'} only. ` +
+    (medList.length
+      ? `They take: ${medList.join('; ')} — nothing else. `
+      : 'No medicines are recorded for them. ') +
+    'Do not claim they use any other medicine. Write in Urdu script.]';
 
   const messages = [
     { role: 'system' as const, content: PERSONA + '\n\n' + ctx.join('\n\n') },
     ...history.slice(0, -1).map((t) => ({ role: (t.role === 'patient' ? 'user' : 'assistant') as 'user' | 'assistant', content: t.text_ur })),
-    { role: 'user' as const, content: a.userTextUr },
+    { role: 'user' as const, content: `${a.userTextUr}\n\n${guard}` },
   ];
 
   try {
-    const out = await chat(messages, { model: MODELS.brain, temperature: 0.5, maxTokens: 220 });
+    let out = await chat(messages, {
+      model: MODELS.brain,
+      temperature: 0.5,
+      maxTokens: isQuestion ? 420 : 220,
+    });
+
+    // The reply is spoken by an Urdu voice, so Roman Urdu is unusable — it is
+    // pronounced as English and comes out as noise. Retry once, hard, rather
+    // than reading gibberish to a patient.
+    if (!isUrduScript(out)) {
+      out = await chat(
+        [
+          ...messages,
+          { role: 'assistant' as const, content: out },
+          { role: 'user' as const, content: 'یہی جواب دوبارہ لکھیں، صرف اردو رسم الخط میں۔ رومن اردو بالکل استعمال نہ کریں۔' },
+        ],
+        { model: MODELS.brain, temperature: 0.2, maxTokens: isQuestion ? 420 : 220 },
+      );
+    }
+
     const clean = out.replace(/[*_#`]/g, '').trim();
-    return clean.length > 3 ? clean : readback(a.extraction) + phrase('didnt_catch').ur;
+    if (clean.length <= 3 || !isUrduScript(clean)) {
+      return readback(a.extraction) + phrase('didnt_catch').ur;
+    }
+    return clean;
   } catch {
     // Model outage must still produce a safe, useful turn.
     const rb = readback(a.extraction);
