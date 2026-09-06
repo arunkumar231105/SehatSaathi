@@ -8,7 +8,6 @@ const LINKS = [
   { h: '/#memory', t: 'Memory' },
   { h: '/#safety', t: 'Safety' },
   { h: '/#caregivers', t: 'Caregivers' },
-  { h: '/#technology', t: 'Technology' },
   { h: '/#faq', t: 'FAQ' },
 ];
 
@@ -49,7 +48,7 @@ export function Footer() {
       <div className="wrap foot__grid">
         <div>
           <div className="brand"><span className="brand__mark">ص</span><span className="brand__name">SehatSaathi</span></div>
-          <p className="fine">Voice-first diabetes companion for Pakistan. Built on Alibaba Cloud Model Studio (Qwen). Open source, MIT licence.</p>
+          <p className="fine">Voice-first diabetes companion for Pakistan. Open source, MIT licence.</p>
         </div>
         <div>
           <b>Product</b>
@@ -58,7 +57,7 @@ export function Footer() {
         </div>
         <div>
           <b>Project</b>
-          <a href="/#technology">Technology</a><Link to="/preflight">System status</Link>
+          <Link to="/preflight">System status</Link>
           <a href="https://github.com" target="_blank" rel="noreferrer">Source code</a>
         </div>
       </div>

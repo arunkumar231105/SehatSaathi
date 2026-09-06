@@ -251,36 +251,6 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* ── Technology ───────────────────────────────────────────────── */}
-      <section className="section section--tint" id="technology">
-        <div className="wrap">
-          <span className="eyebrow">Technology</span>
-          <h2>Built on Alibaba Cloud Model Studio, with the right tool for each job.</h2>
-          <div className="arch">
-            <ArchBox t="WhatsApp · Web" d="Voice note in, voice note out" />
-            <Arrow />
-            <ArchBox t="Groq Whisper" d="Urdu speech → text" />
-            <Arrow />
-            <ArchBox t="Qwen (Alibaba Cloud)" d="Clinical extraction · memory-grounded replies · embeddings" hi />
-            <Arrow />
-            <ArchBox t="Rules engine" d="Deterministic triage" />
-            <Arrow />
-            <ArchBox t="Azure ur-PK voice" d="Native Pakistani Urdu speech" />
-          </div>
-          <div className="tech">
-            <TechItem t="Qwen on Alibaba Cloud" d="qwen-plus-character for reasoning and extraction; qwen3.7-text-embedding for memory recall and grounding." />
-            <TechItem t="PostgreSQL + pgvector" d="Every utterance embedded and searchable; profile facts versioned with provenance." />
-            <TechItem t="Curated knowledge base" d="ADA self-management essentials, IDF-DAR Ramzan guidance, Pakistani foods and locally available medicines." />
-            <TechItem t="Open source · MIT" d="Self-hostable with Docker. Keys never leave the server; nothing is sent to the browser but audio and text." />
-          </div>
-          <p className="fine">
-            An honest note: no Alibaba speech model supports Urdu today. We tested the realtime voice model with native
-            listeners and it was not intelligible, so speech runs on providers with genuine Pakistani Urdu support while
-            Qwen powers everything that makes this a memory agent.
-          </p>
-        </div>
-      </section>
-
       {/* ── Privacy ──────────────────────────────────────────────────── */}
       <section className="section" id="privacy">
         <div className="wrap two">
@@ -294,9 +264,9 @@ export default function Landing() {
           </div>
           <div className="prose">
             <ul className="ticks">
-              <li>Stored on a single server the project controls, in Pakistan-accessible infrastructure — not sold, not shared with advertisers, not used to train any model.</li>
+              <li>Stored on a single server the project controls — not sold, not shared with advertisers, not used to train any model.</li>
               <li>Seen only by the patient and the one family contact they name for emergencies.</li>
-              <li>Provider keys never reach the browser or the phone; the app talks only to our server.</li>
+              <li>Service keys never reach your phone; the app talks only to our server.</li>
               <li>Conversations are kept because the memory is the product — a companion that forgets is just a chatbot. A patient can ask for their record to be deleted at any time.</li>
               <li>The source code is open, so these claims can be checked rather than trusted.</li>
             </ul>
@@ -409,13 +379,6 @@ function Bubble({ who, ur, en }: { who: 'patient' | 'agent'; ur: string; en: str
       <div className="db__en">{en}</div>
     </div>
   );
-}
-function ArchBox({ t, d, hi }: { t: string; d: string; hi?: boolean }) {
-  return <div className={`arch__box ${hi ? 'arch__box--hi' : ''}`}><b>{t}</b><span>{d}</span></div>;
-}
-function Arrow() { return <div className="arch__arrow" aria-hidden>→</div>; }
-function TechItem({ t, d }: { t: string; d: string }) {
-  return <div className="techitem"><h3>{t}</h3><p>{d}</p></div>;
 }
 function Faq({ q, a }: { q: string; a: string }) {
   return <details className="faq"><summary>{q}</summary><p>{a}</p></details>;
