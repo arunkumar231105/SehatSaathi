@@ -44,7 +44,7 @@ export default function Landing() {
           <Stat n="31.4%" l="of Pakistani adults live with diabetes" />
           <Stat n="33M" l="people — the highest prevalence in the world" />
           <Stat n="1 in 3" l="adults affected; most get no support between doctor visits" />
-          <Stat n="0" l="apps that spoke to them in Urdu — until now" />
+          <Stat n="Urdu" l="voice-first, because a health app you cannot read is no help at all" />
         </div>
         <p className="wrap fine center">Source: IDF Diabetes Atlas, 11th edition (2024)</p>
       </section>
