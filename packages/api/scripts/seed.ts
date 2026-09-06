@@ -71,6 +71,7 @@ async function main() {
   const f = (key: string, value: unknown, src: string, confidence = 0.9) =>
     upsertFact({ patientId: pid, key, value, confidence, sourceTurnId: src });
   await f('name', 'راشدہ بی بی', t14a);
+  await f('name_en', 'Rashida Bibi', t14a);
   await f('age', 58, t14a);
   await f('diabetes_type', 'type 2', t14a);
   await f('diagnosis_year', 2019, t14a);
@@ -113,6 +114,7 @@ async function main() {
     patientId: pid, kind: 'symptom',
     summaryUr: 'پچھلے ہفتے آپ نے بتایا تھا کہ پاؤں سن ہو رہا ہے — اب کیسا ہے؟',
     summaryEn: 'Reported foot numbness 7 days ago — check whether it persists',
+    summaryEnPatient: 'Last week you told me your foot was going numb. How is it now?',
     detail: { code: 'foot_numbness' }, followUpAt: ago(4),
   });
   await q(`UPDATE open_concerns SET raised_at=$2 WHERE patient_id=$1 AND detail->>'code'='foot_numbness'`, [pid, ago(7)]);

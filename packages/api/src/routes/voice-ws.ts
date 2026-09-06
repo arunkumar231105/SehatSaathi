@@ -24,6 +24,7 @@ export async function voiceRoutes(app: FastifyInstance): Promise<void> {
     let patientId: string | null = null;
     let sessionId: string | null = null;
     let session: VoiceSession | null = null;
+    let lang: 'ur' | 'en' = 'ur';
 
     const send = (o: unknown) => {
       if (socket.readyState === socket.OPEN) socket.send(JSON.stringify(o));
@@ -32,7 +33,7 @@ export async function voiceRoutes(app: FastifyInstance): Promise<void> {
     const speak = async (text: string) => {
       if (!process.env.AZURE_SPEECH_KEY) { send({ type: 'no_tts', text }); return; }
       try {
-        for await (const chunk of speakUrduStream(text)) send({ type: 'audio', pcm: chunk.toString('base64') });
+        for await (const chunk of speakUrduStream(text, { lang })) send({ type: 'audio', pcm: chunk.toString('base64') });
       } catch {
         send({ type: 'no_tts', text });
       }
@@ -44,11 +45,11 @@ export async function voiceRoutes(app: FastifyInstance): Promise<void> {
 
       const adapter = new CascadeAdapter(async (userTextUr) => {
         send({ type: 'state', state: 'thinking' });
-        const r = await respond({ patientId: pid, sessionId: sessionId!, userTextUr, channel: 'web' });
+        const r = await respond({ patientId: pid, sessionId: sessionId!, userTextUr, channel: 'web', lang });
         lastTurn = { severity: r.severity, findings: r.findings };
         return { replyUr: r.replyUr, audioOverride: r.audioOverride };
       });
-      session = await adapter.open({ instructions: '' });
+      session = await adapter.open({ instructions: '', lang });
 
       session.on('userTranscript', (text) => send({ type: 'user_transcript', text }));
       session.on('agentTranscript', (text) => { send({ type: 'agent_transcript', text }); send({ type: 'state', state: 'speaking' }); });
@@ -74,9 +75,10 @@ export async function voiceRoutes(app: FastifyInstance): Promise<void> {
           session?.appendAudio(Buffer.from(data));
           return;
         }
-        const msg = JSON.parse(data.toString()) as { type: string; patientId?: string };
+        const msg = JSON.parse(data.toString()) as { type: string; patientId?: string; lang?: 'ur' | 'en' };
         switch (msg.type) {
           case 'start':
+            if (msg.lang) lang = msg.lang;
             if (msg.patientId) await start(msg.patientId);
             break;
           case 'commit':
@@ -89,7 +91,7 @@ export async function voiceRoutes(app: FastifyInstance): Promise<void> {
             break;
           case 'greet': {
             if (!patientId) break;
-            const g = await greeting(patientId);
+            const g = await greeting(patientId, lang);
             send({ type: 'agent_transcript', text: g.textUr });
             send({ type: 'state', state: 'speaking' });
             await speak(g.textUr);

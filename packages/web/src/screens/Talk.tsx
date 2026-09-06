@@ -1,14 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useVoice, type VoiceState } from '../voice/useVoice.ts';
-
-const LABEL: Record<VoiceState, string> = {
-  connecting: 'جڑ رہا ہے…',
-  idle: 'دبا کر رکھیں اور بولیں',
-  listening: 'سن رہی ہوں…',
-  thinking: 'سوچ رہی ہوں…',
-  speaking: 'بول رہی ہوں…',
-  error: 'دوبارہ کوشش کریں',
-};
+import { t, dir, lang } from '../i18n.ts';
 
 export default function Talk({ patientId, caregiverPhone }: { patientId: string; caregiverPhone?: string | null }) {
   const v = useVoice(patientId);
@@ -16,6 +8,16 @@ export default function Talk({ patientId, caregiverPhone }: { patientId: string;
   const [showType, setShowType] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
   const holding = useRef(false);
+  const s = t();
+
+  const LABEL: Record<VoiceState, string> = {
+    connecting: s.connecting,
+    idle: s.holdToTalk,
+    listening: s.listening,
+    thinking: s.thinking,
+    speaking: s.speaking,
+    error: s.tryAgain,
+  };
 
   useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: 'smooth' });
@@ -37,40 +39,50 @@ export default function Talk({ patientId, caregiverPhone }: { patientId: string;
 
   const red = v.severity === 'red';
   const waMsg = encodeURIComponent(
-    `⚠️ صحت ساتھی: ${v.findings[0]?.reasonUr ?? 'ہنگامی صورتحال'} — فوراً رابطہ کریں۔`,
+    `${s.urgent} ${v.findings[0]?.reasonUr ?? ''}`.trim(),
   );
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const text = typed.trim();
+    if (!text) return;
+    setTyped('');
+    void v.sendText(text);
+  };
 
   return (
     <section className="talk">
       {red && (
-        <div className="emergency" role="alert">
-          <div className="emergency__title">⚠️ فوری توجہ</div>
-          <p className="emergency__text">{v.findings[0]?.reasonUr}</p>
-          <a className="btn btn--danger" href="tel:1122">📞 1122 پر کال کریں</a>
+        <div className="emergency" role="alert" dir={dir()}>
+          <div className="emergency__title">{s.urgent}</div>
+          <p className="emergency__text">
+            {lang() === 'en' ? v.findings[0]?.reasonEn : v.findings[0]?.reasonUr}
+          </p>
+          <a className="btn btn--danger" href="tel:1122">{s.call1122}</a>
           {caregiverPhone && (
             <a className="btn btn--wa" href={`https://wa.me/${caregiverPhone.replace(/\D/g, '')}?text=${waMsg}`} target="_blank" rel="noreferrer">
-              💬 گھر والوں کو واٹس ایپ کریں
+              {s.waFamily}
             </a>
           )}
-          <button className="btn btn--ghost" onClick={v.dismissAlert}>ٹھیک ہے</button>
+          <button className="btn btn--ghost" onClick={v.dismissAlert}>{s.ok}</button>
         </div>
       )}
 
-      <div className="transcript" ref={listRef}>
+      <div className="transcript" ref={listRef} dir={dir()}>
         {v.turns.length === 0 && (
           <div className="hint">
-            <p>بٹن دبا کر رکھیں اور بتائیں:</p>
-            <p className="hint__ex">«آج شوگر دو سو پچاس تھی، چکر آ رہے ہیں»</p>
-            <button className="btn btn--ghost" onClick={v.greet}>🔊 صحت ساتھی کو سنیں</button>
+            <p>{s.hintLead}</p>
+            <p className="hint__ex">{s.hintExample}</p>
+            <button className="btn btn--ghost" onClick={v.greet}>{s.listen}</button>
           </div>
         )}
-        {v.turns.map((t, i) => (
-          <div key={i} className={`bubble bubble--${t.role}`}>{t.text}</div>
+        {v.turns.map((turn, i) => (
+          <div key={i} className={`bubble bubble--${turn.role}`}>{turn.text}</div>
         ))}
         {v.severity === 'amber' && v.findings[0] && (
-          <div className="amber">⚠ {v.findings[0].reasonUr}</div>
+          <div className="amber">⚠ {lang() === 'en' ? v.findings[0].reasonEn : v.findings[0].reasonUr}</div>
         )}
-        {v.error && <div className="err">خرابی: {v.error}</div>}
+        {v.error && <div className="err">{s.error}: {v.error}</div>}
       </div>
 
       <div className="talk__controls">
@@ -84,25 +96,28 @@ export default function Talk({ patientId, caregiverPhone }: { patientId: string;
           disabled={v.state === 'connecting'}
           aria-label="hold to talk"
         >
-          <span className="mic__icon">{v.state === 'listening' ? '●' : v.state === 'speaking' ? '🔊' : v.state === 'thinking' ? '…' : '🎤'}</span>
+          <span className="mic__icon">
+            {v.state === 'listening' ? '●' : v.state === 'speaking' ? '🔊' : v.state === 'thinking' ? '…' : '🎤'}
+          </span>
         </button>
         <div className="mic__label">{LABEL[v.state]}</div>
 
-        <button className="link" onClick={() => setShowType((s) => !s)}>
-          {showType ? 'بند کریں' : 'لکھ کر بتائیں'}
+        <button className="link" onClick={() => setShowType((x) => !x)}>
+          {showType ? s.close : s.typeInstead}
         </button>
         {showType && (
-          <form
-            className="typebar"
-            onSubmit={(e) => { e.preventDefault(); void v.sendText(typed); setTyped(''); }}
-          >
-            <input value={typed} onChange={(e) => setTyped(e.target.value)} placeholder="یہاں لکھیں…" dir="rtl" />
-            <button className="btn" type="submit">بھیجیں</button>
+          <form className="typebar" onSubmit={submit}>
+            <input
+              value={typed}
+              onChange={(e) => setTyped(e.target.value)}
+              placeholder={s.typeHere}
+              dir={dir()}
+              autoFocus
+            />
+            <button className="btn btn--primary" type="submit" disabled={!typed.trim()}>{s.send}</button>
           </form>
         )}
-        {!v.caps.tts && v.state !== 'connecting' && (
-          <div className="note">آواز فون کی اپنی ہے (سرور پر اردو آواز سیٹ نہیں)</div>
-        )}
+        {!v.caps.tts && v.state !== 'connecting' && <div className="note">{s.noTts}</div>}
       </div>
     </section>
   );

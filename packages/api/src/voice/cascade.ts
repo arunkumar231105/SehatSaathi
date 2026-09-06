@@ -95,7 +95,7 @@ class CascadeSession implements VoiceSession {
     this.aborted = false;
 
     try {
-      const { text } = await transcribeUrdu(pcm);
+      const { text } = await transcribeUrdu(pcm, this.opts.lang ?? 'ur');
       if (this.aborted) return;
 
       // Whisper emits a bare hallucinated phrase on pure silence; an empty or
@@ -117,7 +117,7 @@ class CascadeSession implements VoiceSession {
         // Safety path: cached clip, no network call.
         this.emitter.emit('audio', audioOverride);
       } else {
-        for await (const chunk of speakUrduStream(replyUr, { voice: voice ?? this.opts.voice })) {
+        for await (const chunk of speakUrduStream(replyUr, { voice: voice ?? this.opts.voice, lang: this.opts.lang ?? 'ur' })) {
           if (this.aborted) break;
           this.emitter.emit('audio', chunk);
         }

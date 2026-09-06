@@ -9,6 +9,7 @@ import { RULES } from './rules.ts';
 
 export interface Phrase {
   ur: string;
+  /** Patient-facing English, NOT the clinician audit line. */
   en: string;
 }
 
@@ -37,7 +38,7 @@ const EXTRA: Record<string, Phrase> = {
 
 /** rule phraseKey -> phrase, plus the extras above. */
 export const PHRASES: Record<string, Phrase> = {
-  ...Object.fromEntries(RULES.map((r) => [r.phraseKey, { ur: r.reasonUr, en: r.reasonEn }])),
+  ...Object.fromEntries(RULES.map((r) => [r.phraseKey, { ur: r.reasonUr, en: r.patientEn }])),
   ...EXTRA,
 };
 

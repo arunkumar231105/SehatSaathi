@@ -164,6 +164,7 @@ export async function upsertFact(args: {
       kind: 'contradiction',
       summaryUr: contradictionUr(args.key, cur.value, args.value),
       summaryEn: `Conflicting "${args.key}": earlier ${JSON.stringify(cur.value)}, now ${JSON.stringify(args.value)}`,
+      summaryEnPatient: contradictionEn(args.key, cur.value, args.value),
       detail: { key: args.key, previous: cur.value, current: args.value },
       followUpAt: new Date(),
     });
@@ -187,6 +188,24 @@ const KEY_UR: Record<string, string> = {
   smoking: 'سگریٹ',
   exercise: 'ورزش',
 };
+
+const KEY_EN: Record<string, string> = {
+  medications: "your medicine", diabetes_type: "your diabetes type", roti_per_meal: "how many rotis you eat",
+  fasts_in_ramzan: "fasting in Ramzan", caregiver: "your family contact", age: "your age",
+  diagnosis_year: "when you were diagnosed", comorbidities: "your other conditions", work: "your work",
+  diet_habits: "your eating habits", insulin: "insulin", smoking: "smoking", exercise: "exercise",
+};
+
+function contradictionEn(key: string, prev: unknown, cur: unknown): string {
+  return `Earlier you told me ${shortEn(prev)} about ${KEY_EN[key] ?? key}, and now ${shortEn(cur)}. Which one is right?`;
+}
+
+function shortEn(v: unknown): string {
+  const s = Array.isArray(v) ? v.map(String).join(", ")
+    : typeof v === "boolean" ? (v ? "yes" : "no")
+    : typeof v === "string" ? v : JSON.stringify(v);
+  return s.length > 60 ? s.slice(0, 60) + "…" : s;
+}
 
 function contradictionUr(key: string, prev: unknown, cur: unknown): string {
   const k = KEY_UR[key] ?? key;
@@ -335,7 +354,10 @@ export async function raiseConcern(args: {
   patientId: string;
   kind: Concern['kind'];
   summaryUr: string;
+  /** Clinician note — shown on the caregiver dashboard. */
   summaryEn?: string;
+  /** Patient-facing English — what is spoken in English mode. */
+  summaryEnPatient?: string;
   detail?: Record<string, unknown>;
   followUpAt?: Date;
 }): Promise<void> {
@@ -359,7 +381,7 @@ export async function raiseConcern(args: {
       args.kind,
       args.summaryUr,
       args.summaryEn ?? null,
-      args.detail ? JSON.stringify(args.detail) : null,
+      JSON.stringify({ ...(args.detail ?? {}), ...(args.summaryEnPatient ? { en_patient: args.summaryEnPatient } : {}) }),
       args.followUpAt ?? null,
     ],
   );

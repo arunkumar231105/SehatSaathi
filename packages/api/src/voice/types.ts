@@ -28,6 +28,8 @@ export interface VoiceSessionOptions {
   instructions: string;
   tools?: ToolDef[];
   voice?: string;
+  /** Drives both the transcription language and the speaking voice. */
+  lang?: "ur" | "en";
 }
 
 export interface ToolCall {

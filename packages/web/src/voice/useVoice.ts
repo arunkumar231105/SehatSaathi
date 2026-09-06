@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { MicCapture } from '../audio/capture.ts';
+import { getLang, resetPatient } from '../api.ts';
 import { PcmPlayer } from '../audio/player.ts';
 
 export type VoiceState = 'connecting' | 'idle' | 'listening' | 'thinking' | 'speaking' | 'error';
@@ -59,7 +60,7 @@ export function useVoice(patientId: string | null): VoiceApi {
 
     player.current.onEnded = () => setState((s) => (s === 'speaking' ? 'idle' : s));
 
-    sock.onopen = () => sock.send(JSON.stringify({ type: 'start', patientId }));
+    sock.onopen = () => sock.send(JSON.stringify({ type: 'start', patientId, lang: getLang() }));
     sock.onclose = () => setState('error');
     sock.onerror = () => { setError('connection'); setState('error'); };
     sock.onmessage = (ev) => {
@@ -137,15 +138,25 @@ export function useVoice(patientId: string | null): VoiceApi {
     setTurns((t) => [...t, { role: 'patient', text, at: Date.now() }]);
     setState('thinking');
     try {
-      const r = await fetch(`/api/patients/${patientId}/turn`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }),
+      let r = await fetch(`/api/patients/${patientId}/turn`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, lang: getLang() }),
       });
+      // A cached patient id can outlive the row (the demo patient is reseeded).
+      // Recover silently instead of showing the patient a foreign-key error.
+      if (r.status === 404) {
+        const fresh = await resetPatient();
+        r = await fetch(`/api/patients/${fresh}/turn`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, lang: getLang() }),
+        });
+        location.reload();
+      }
+      if (!r.ok) throw new Error(`${r.status}`);
       const j = (await r.json()) as { replyUr: string; severity: 'red' | 'amber' | 'none'; findings: Finding[] };
       setTurns((t) => [...t, { role: 'agent', text: j.replyUr, at: Date.now() }]);
       setSeverity(j.severity);
       setFindings(j.findings);
       setState('speaking');
-      const a = await fetch(`/api/tts?text=${encodeURIComponent(j.replyUr)}`);
+      const a = await fetch(`/api/tts?lang=${getLang()}&text=${encodeURIComponent(j.replyUr)}`);
       if (a.ok) {
         const buf = new Uint8Array(await a.arrayBuffer());
         let bin = ''; for (let i = 0; i < buf.length; i++) bin += String.fromCharCode(buf[i]!);

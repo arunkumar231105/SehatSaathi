@@ -7,18 +7,20 @@ import Timeline from './screens/Timeline.tsx';
 import Memory from './screens/Memory.tsx';
 import Care from './screens/Care.tsx';
 import Preflight from './screens/Preflight.tsx';
-import { getPatientId, get } from './api.ts';
+import { getPatientId, get, getLang, setLang } from './api.ts';
+import { t, dir } from './i18n.ts';
 
-const APP_NAV = [
-  { p: '/app', ur: 'بات کریں', icon: '🎤' },
-  { p: '/app/timeline', ur: 'ریکارڈ', icon: '📈' },
-  { p: '/app/memory', ur: 'یادداشت', icon: '🧠' },
+const APP_NAV = (s: ReturnType<typeof t>) => [
+  { p: '/app', label: s.tabTalk, icon: '🎤' },
+  { p: '/app/timeline', label: s.tabRecord, icon: '📈' },
+  { p: '/app/memory', label: s.tabMemory, icon: '🧠' },
 ];
 
 export default function App() {
   const path = usePath();
   const [pid, setPid] = useState<string | null>(null);
   const [caregiverPhone, setCaregiverPhone] = useState<string | null>(null);
+  const [, setTick] = useState(0);   // re-render the whole app on a language change
 
   const inApp = path.startsWith('/app');
   useEffect(() => { if (inApp && !pid) void getPatientId().then(setPid); }, [inApp, pid]);
@@ -46,14 +48,14 @@ export default function App() {
   } else body = <NotFound />;
 
   return (
-    <div className={`app ${inApp ? 'app--patient' : ''}`}>
-      <Nav path={path} />
+    <div className={`app ${inApp ? 'app--patient' : ''} ${inApp ? `app--${getLang()}` : ''}`}>
+      <Nav path={path} onLang={() => { setLang(getLang() === 'en' ? 'ur' : 'en'); setTick((n) => n + 1); }} />
       <main className="main">{body}</main>
       {inApp && (
-        <nav className="tabs" dir="rtl">
-          {APP_NAV.map((n) => (
+        <nav className="tabs" dir={dir()}>
+          {APP_NAV(t()).map((n) => (
             <Link key={n.p} to={n.p} className={path === n.p ? 'tabs__a tabs__a--on' : 'tabs__a'}>
-              <span className="tabs__i">{n.icon}</span><span className="tabs__t">{n.ur}</span>
+              <span className="tabs__i">{n.icon}</span><span className="tabs__t">{n.label}</span>
             </Link>
           ))}
         </nav>

@@ -50,7 +50,12 @@ export interface Finding {
    *  never generated live — a TTS outage must not silence an emergency. */
   phraseKey: string;
   reasonUr: string;
+  /** Clinician-facing. Goes to the caregiver dashboard and the audit log. */
   reasonEn: string;
+  /** Patient-facing English — what is actually said to someone using the app
+   *  in English. "Patient instructed on the 15-15 rule" is a note about a
+   *  patient, not something you say to one. */
+  patientEn: string;
 }
 
 interface Rule {
@@ -59,6 +64,7 @@ interface Rule {
   phraseKey: string;
   reasonUr: string;
   reasonEn: string;
+  patientEn: string;
   test: (s: ClinicalSnapshot) => boolean;
 }
 
@@ -87,7 +93,9 @@ export const RULES: Rule[] = [
     reasonUr:
       'آپ کی شوگر بہت کم ہے۔ ابھی فوراً تین چمچ چینی یا آدھا گلاس میٹھا جوس لیں، پھر پندرہ منٹ بعد دوبارہ شوگر چیک کریں۔',
     reasonEn:
-      'Blood glucose below 70 mg/dL — hypoglycaemia. Patient instructed on the 15-15 rule.',
+      'Blood glucose below 70 mg/dL — hypoglycaemia. Patient instructed on the 15-15 rule.',    patientEn:
+      'Your sugar is very low. Take three teaspoons of sugar or half a glass of sweet juice right now, then check again after fifteen minutes.',
+
     // Below 70 is hypoglycaemia regardless of context or symptoms.
     test: (s) => s.glucoseMgDl !== undefined && s.glucoseMgDl < 70,
   },
@@ -98,7 +106,9 @@ export const RULES: Rule[] = [
     reasonUr:
       'آپ کی شوگر بہت زیادہ ہے اور ساتھ میں ایسی علامات ہیں جو خطرناک ہو سکتی ہیں۔ فوراً ہسپتال جائیں یا 1122 پر کال کریں۔',
     reasonEn:
-      'Glucose above 250 mg/dL with ketoacidosis-suggestive symptoms — possible DKA.',
+      'Glucose above 250 mg/dL with ketoacidosis-suggestive symptoms — possible DKA.',    patientEn:
+      'Your sugar is very high and these symptoms can be dangerous. Please go to a hospital now, or call 1122.',
+
     // High sugar alone is urgent; high sugar WITH these symptoms is an emergency.
     test: (s) =>
       s.glucoseMgDl !== undefined &&
@@ -112,6 +122,8 @@ export const RULES: Rule[] = [
     reasonUr:
       'آپ کی شوگر خطرناک حد تک زیادہ ہے۔ پانی پیتے رہیں اور فوراً ڈاکٹر سے رابطہ کریں۔',
     reasonEn: 'Blood glucose above 300 mg/dL — severe hyperglycaemia.',
+    patientEn:
+      'Your sugar is dangerously high. Keep drinking water and contact your doctor immediately.',
     test: (s) => s.glucoseMgDl !== undefined && s.glucoseMgDl > 300,
   },
   {
@@ -122,6 +134,8 @@ export const RULES: Rule[] = [
       'یہ ہنگامی حالت ہو سکتی ہے۔ فوراً 1122 پر کال کریں یا قریبی ہسپتال جائیں۔',
     reasonEn:
       'Chest pain, unilateral weakness, slurred speech, sudden vision loss or confusion — possible cardiac or cerebrovascular event.',
+    patientEn:
+      'This can be an emergency. Please call 1122 right now, or go to the nearest hospital.',
     test: (s) =>
       has(s, 'chest_pain', 'one_sided_weakness', 'slurred_speech', 'sudden_vision_loss', 'confusion'),
   },
@@ -132,7 +146,9 @@ export const RULES: Rule[] = [
     reasonUr:
       'ذیابیطس میں پاؤں کا زخم بہت جلدی بگڑ جاتا ہے۔ آج ہی ڈاکٹر کو ضرور دکھائیں۔',
     reasonEn:
-      'Foot ulcer, non-healing wound or spreading erythema — diabetic foot infection risk.',
+      'Foot ulcer, non-healing wound or spreading erythema — diabetic foot infection risk.',    patientEn:
+      'In diabetes a foot wound can get worse very quickly. Please show it to a doctor today.',
+
     // Diabetic foot infections escalate fast and are a leading amputation
     // cause in Pakistan; this never waits for a follow-up conversation.
     test: (s) => has(s, 'foot_ulcer', 'non_healing_wound', 'spreading_redness'),
@@ -143,7 +159,9 @@ export const RULES: Rule[] = [
     phraseKey: 'pregnancy_urgent',
     reasonUr:
       'حمل کے دوران شوگر کا کنٹرول بہت ضروری ہے۔ براہِ کرم آج ہی اپنے ڈاکٹر سے رابطہ کریں۔',
-    reasonEn: 'Abnormal glucose during pregnancy — tighter thresholds apply.',
+    reasonEn: 'Abnormal glucose during pregnancy — tighter thresholds apply.',    patientEn:
+      'Sugar control is very important during pregnancy. Please contact your doctor today.',
+
     // Pregnancy narrows the safe band considerably, so a reading that would
     // only be amber otherwise is escalated.
     test: (s) =>
@@ -160,6 +178,8 @@ export const RULES: Rule[] = [
     reasonUr:
       'آپ کی شوگر کئی دن سے زیادہ چل رہی ہے۔ کھانے میں احتیاط کریں اور جلد ڈاکٹر سے ملیں۔',
     reasonEn: 'Majority of readings above 180 mg/dL over the last 7 days.',
+    patientEn:
+      'Your sugar has been high for several days. Be careful with food and see your doctor soon.',
     test: (s) => sustainedHigh(s, 7, 180),
   },
   {
@@ -168,6 +188,8 @@ export const RULES: Rule[] = [
     phraseKey: 'single_high',
     reasonUr: 'آپ کی شوگر معمول سے زیادہ ہے۔ پانی پیئیں اور تھوڑی چہل قدمی کریں۔',
     reasonEn: 'Single reading between 180 and 300 mg/dL.',
+    patientEn:
+      'Your sugar is higher than normal. Drink some water and take a short walk.',
     test: (s) =>
       s.glucoseMgDl !== undefined && s.glucoseMgDl > 180 && s.glucoseMgDl <= 300,
   },
@@ -178,6 +200,8 @@ export const RULES: Rule[] = [
     reasonUr:
       'لگتا ہے آپ سے دوا کچھ دن رہ گئی ہے۔ دوا وقت پر لینا بہت ضروری ہے۔',
     reasonEn: 'Three or more missed doses reported in the last 7 days.',
+    patientEn:
+      'It looks like you have missed your medicine for a few days. Taking it on time matters a lot.',
     test: (s) => (s.missedDosesLast7Days ?? 0) >= 3,
   },
   {
@@ -187,6 +211,8 @@ export const RULES: Rule[] = [
     reasonUr:
       'پاؤں میں سن ہونا یا سوئیاں چبھنا ذیابیطس کی وجہ سے ہو سکتا ہے۔ ڈاکٹر سے معائنہ کروائیں۔',
     reasonEn: 'New numbness or tingling — possible peripheral neuropathy.',
+    patientEn:
+      'Numbness or tingling in the feet can be caused by diabetes. Please get it checked by a doctor.',
     test: (s) => has(s, 'foot_numbness', 'tingling'),
   },
   {
@@ -195,6 +221,8 @@ export const RULES: Rule[] = [
     phraseKey: 'weight_loss',
     reasonUr: 'بغیر کوشش کے وزن کم ہونا اہم علامت ہے۔ ڈاکٹر سے مشورہ کریں۔',
     reasonEn: 'Unexplained weight loss reported.',
+    patientEn:
+      'Losing weight without trying is worth checking. Please discuss it with your doctor.',
     test: (s) => has(s, 'weight_loss'),
   },
 ];
@@ -220,12 +248,13 @@ export function triage(snapshot: ClinicalSnapshot): TriageResult {
       // rather than taking the safety layer offline.
       return false;
     }
-  }).map(({ id, severity, phraseKey, reasonUr, reasonEn }) => ({
+  }).map(({ id, severity, phraseKey, reasonUr, reasonEn, patientEn }) => ({
     ruleId: id,
     severity,
     phraseKey,
     reasonUr,
     reasonEn,
+    patientEn,
   }));
 
   const severity: Severity | 'none' = findings.some((f) => f.severity === 'red')

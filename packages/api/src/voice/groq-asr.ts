@@ -54,15 +54,18 @@ const DOMAIN_PROMPT =
   'روٹی، چاول، دال، چائے، دوا، ڈاکٹر، ہسپتال، پاؤں، سن، زخم۔ ' +
   'sugar, insulin, metformin, glucose, check, fasting, mg/dL.';
 
-export async function transcribeUrdu(pcm16k: Buffer): Promise<TranscriptionResult> {
-  return transcribeFile(pcmToWav(pcm16k), 'audio.wav', 'audio/wav');
+export async function transcribeUrdu(
+  pcm16k: Buffer,
+  lang: 'ur' | 'en' = 'ur',
+): Promise<TranscriptionResult> {
+  return transcribeFile(pcmToWav(pcm16k), 'audio.wav', 'audio/wav', lang);
 }
 
 /**
  * Any container Whisper accepts — used for WhatsApp voice notes, which arrive
  * as ogg/opus and are sent through untouched rather than decoded first.
  */
-export async function transcribeFile(data: Buffer, filename: string, mime: string): Promise<TranscriptionResult> {
+export async function transcribeFile(data: Buffer, filename: string, mime: string, lang: "ur" | "en" = "ur"): Promise<TranscriptionResult> {
   const key = process.env.GROQ_API_KEY;
   if (!key) throw new Error('GROQ_API_KEY is not set');
 
@@ -72,7 +75,7 @@ export async function transcribeFile(data: Buffer, filename: string, mime: strin
   // SharedArrayBuffer, which Blob's types (correctly) reject.
   form.append('file', new Blob([new Uint8Array(data)], { type: mime }), filename);
   form.append('model', MODEL);
-  form.append('language', 'ur');
+  form.append('language', lang);
   form.append('prompt', DOMAIN_PROMPT);
   form.append('response_format', 'json');
   // Greedy decoding: deterministic, and we never want Whisper inventing a

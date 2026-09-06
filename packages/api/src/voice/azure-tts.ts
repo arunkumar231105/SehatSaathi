@@ -33,7 +33,19 @@ export interface SpeakOptions {
   voice?: string;
   /** -50%..+50%. Slightly slower helps older and low-literacy listeners. */
   rate?: string;
+  /** Picks the locale and default voice. Pakistani English, not US. */
+  lang?: "ur" | "en";
 }
+
+// Azure has no en-PK voices at all — en-IN is the closest South Asian English
+// and is what a Pakistani listener finds natural. Verified against the live
+// voice list; en-PK-* returns HTTP 500.
+const EN_VOICE = process.env.AZURE_TTS_VOICE_EN ?? "en-IN-NeerjaNeural";
+const pick = (o: SpeakOptions) => ({
+  voice: o.voice ?? (o.lang === "en" ? EN_VOICE : VOICE),
+  locale: o.lang === "en" ? "en-IN" : "ur-PK",
+  rate: o.rate ?? "-8%",
+});
 
 /**
  * Synthesise Urdu text to raw PCM.
@@ -44,13 +56,11 @@ export interface SpeakOptions {
 export async function speakUrdu(text: string, opts: SpeakOptions = {}): Promise<Buffer> {
   if (!KEY) throw new Error('AZURE_SPEECH_KEY is not set');
 
-  const voice = opts.voice ?? VOICE;
   // Default a little slower than natural: this audience includes elderly
   // patients and first-time smartphone users.
-  const rate = opts.rate ?? '-8%';
-
+  const { voice, locale, rate } = pick(opts);
   const ssml =
-    `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="ur-PK">` +
+    `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="${locale}">` +
     `<voice name="${voice}"><prosody rate="${rate}">${esc(text)}</prosody></voice>` +
     `</speak>`;
 
@@ -85,10 +95,9 @@ export async function* speakUrduStream(
 ): AsyncGenerator<Buffer> {
   if (!KEY) throw new Error('AZURE_SPEECH_KEY is not set');
 
-  const voice = opts.voice ?? VOICE;
-  const rate = opts.rate ?? '-8%';
+  const { voice, locale, rate } = pick(opts);
   const ssml =
-    `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="ur-PK">` +
+    `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="${locale}">` +
     `<voice name="${voice}"><prosody rate="${rate}">${esc(text)}</prosody></voice>` +
     `</speak>`;
 
@@ -123,10 +132,9 @@ export async function* speakUrduStream(
  */
 export async function speakUrduOgg(text: string, opts: SpeakOptions = {}): Promise<Buffer> {
   if (!KEY) throw new Error('AZURE_SPEECH_KEY is not set');
-  const voice = opts.voice ?? VOICE;
-  const rate = opts.rate ?? '-8%';
+  const { voice, locale, rate } = pick(opts);
   const ssml =
-    `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="ur-PK">` +
+    `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="${locale}">` +
     `<voice name="${voice}"><prosody rate="${rate}">${esc(text)}</prosody></voice>` +
     `</speak>`;
   const res = await fetch(ENDPOINT(), {

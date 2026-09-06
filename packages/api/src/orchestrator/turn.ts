@@ -25,6 +25,7 @@ import { retrieve } from '../rag/kb.ts';
 import { bus } from '../bus.ts';
 
 export type Channel = 'web' | 'whatsapp' | 'api';
+export type Lang = 'ur' | 'en';
 
 export interface TurnResult {
   replyUr: string;
@@ -39,6 +40,13 @@ export interface TurnResult {
   patientTurnId: string;
   agentTurnId: string;
 }
+
+const SYMPTOM_EN: Partial<Record<SymptomCode, string>> = {
+  foot_numbness: "your foot going numb", tingling: "tingling", blurred_vision: "blurred vision",
+  fatigue: "feeling weak", weight_loss: "losing weight", excessive_thirst: "feeling very thirsty",
+  frequent_urination: "passing urine often", dizziness: "dizziness", nausea: "nausea",
+  non_healing_wound: "a wound not healing", foot_ulcer: "a wound on your foot",
+};
 
 const SYMPTOM_UR: Partial<Record<SymptomCode, string>> = {
   foot_numbness: 'پاؤں کا سن ہونا',
@@ -103,13 +111,23 @@ function readback(ex: Extraction): string {
   return `آپ نے بتایا ${ctx}شوگر ${ex.glucose_mg_dl}۔ `;
 }
 
+function readbackEn(ex: Extraction): string {
+  if (ex.glucose_mg_dl === null) return '';
+  const ctx =
+    ex.glucose_context === 'fasting' ? 'fasting ' :
+    ex.glucose_context === 'post_meal' ? 'after-meal ' : '';
+  return `You said your ${ctx}sugar was ${ex.glucose_mg_dl}. `;
+}
+
 export async function respond(args: {
   patientId: string;
   sessionId: string;
   userTextUr: string;
   channel: Channel;
+  lang?: Lang;
 }): Promise<TurnResult> {
   const { patientId, sessionId, userTextUr } = args;
+  const lang: Lang = args.lang ?? 'ur';
 
   // 1. persist the patient's words first — nothing downstream may lose them
   const patientTurnId = await storeTurn({ patientId, sessionId, role: 'patient', textUr: userTextUr });
@@ -147,9 +165,13 @@ export async function respond(args: {
   if (result.severity === 'red') {
     // ── Emergency: fixed words, fixed audio, human notified. No model. ──
     const primary = result.findings.find((f) => f.severity === 'red')!;
-    const rb = readback(extraction);
-    replyUr = rb + phrase(primary.phraseKey).ur;
-    if (caregiverPhone?.caregiver_phone) replyUr += ' ' + phrase('caregiver_notified').ur;
+    const rb = lang === 'en' ? readbackEn(extraction) : readback(extraction);
+    const p = phrase(primary.phraseKey);
+    replyUr = rb + (lang === 'en' ? p.en : p.ur);
+    if (caregiverPhone?.caregiver_phone) {
+      const n = phrase('caregiver_notified');
+      replyUr += ' ' + (lang === 'en' ? n.en : n.ur);
+    }
 
     const clip = await getClip(primary.phraseKey);
     if (clip && !rb) audioOverride = clip;
@@ -160,8 +182,9 @@ export async function respond(args: {
     // ── Normal turn: the model speaks, grounded in memory ──
     replyUr = await generateReply({
       userTextUr, extraction, facts, features, patientId,
-      name: (fact(facts, 'name') as string | undefined) ?? caregiverPhone?.display_name ?? undefined,
+      name: ((lang === 'en' ? fact(facts, 'name_en') : undefined) ?? fact(facts, 'name') ?? caregiverPhone?.display_name ?? undefined) as string | undefined,
       amber: result.findings.filter((f) => f.severity === 'amber'),
+      lang,
     });
     for (const f of result.findings) {
       if (f.severity === 'amber') alertId = await insertAlert(patientId, patientTurnId, f);
@@ -255,6 +278,18 @@ Answering well:
 SCRIPT — this is critical. Always write in Urdu script (اردو رسم الخط), never Roman Urdu, even if the patient writes to you in Roman letters. Your reply is read aloud by an Urdu text-to-speech voice: Roman letters are pronounced as English and come out as noise the patient cannot understand.
 - Output plain spoken Urdu only. No lists, no markdown, no emojis, no headings.`;
 
+/**
+ * English mode. Same companion, same limits — Pakistani English as a nurse in
+ * Lahore would speak it, not textbook British English, and local food and
+ * medicine names kept as they are.
+ */
+const PERSONA_EN = PERSONA.replace(
+  /SCRIPT — this is critical[\s\S]*$/,
+  `LANGUAGE — reply in simple, warm English as a Pakistani nurse would speak it. Short sentences, no medical jargon. Keep local words the patient uses (roti, daal, biryani, chai, sehri, iftar) rather than translating them. Numbers as digits.
+- Output plain text only. No lists, no markdown, no emojis, no headings.`,
+).replace('You speak SIMPLE spoken Urdu, like an experienced, kind family nurse — never clinical jargon, never English sentences (drug and brand names in English are fine).',
+  'You speak SIMPLE, warm English, like an experienced, kind family nurse — never clinical jargon.');
+
 async function generateReply(a: {
   userTextUr: string;
   extraction: Extraction;
@@ -263,6 +298,7 @@ async function generateReply(a: {
   patientId: string;
   name?: string;
   amber: Finding[];
+  lang: Lang;
 }): Promise<string> {
   // Questions deserve more reference material and more room to answer.
   const isQuestion = a.extraction.intent === 'question';
@@ -325,10 +361,11 @@ async function generateReply(a: {
     (medList.length
       ? `They take: ${medList.join('; ')} — nothing else. `
       : 'No medicines are recorded for them. ') +
-    'Do not claim they use any other medicine. Write in Urdu script.]';
+    'Do not claim they use any other medicine. ' +
+    (a.lang === 'en' ? 'Write in English.]' : 'Write in Urdu script.]');
 
   const messages = [
-    { role: 'system' as const, content: PERSONA + '\n\n' + ctx.join('\n\n') },
+    { role: 'system' as const, content: (a.lang === 'en' ? PERSONA_EN : PERSONA) + '\n\n' + ctx.join('\n\n') },
     ...history.slice(0, -1).map((t) => ({ role: (t.role === 'patient' ? 'user' : 'assistant') as 'user' | 'assistant', content: t.text_ur })),
     { role: 'user' as const, content: `${a.userTextUr}\n\n${guard}` },
   ];
@@ -342,8 +379,9 @@ async function generateReply(a: {
 
     // The reply is spoken by an Urdu voice, so Roman Urdu is unusable — it is
     // pronounced as English and comes out as noise. Retry once, hard, rather
-    // than reading gibberish to a patient.
-    if (!isUrduScript(out)) {
+    // than reading gibberish to a patient. (English mode wants the opposite,
+    // so this check only applies to Urdu.)
+    if (a.lang !== 'en' && !isUrduScript(out)) {
       out = await chat(
         [
           ...messages,
@@ -355,8 +393,12 @@ async function generateReply(a: {
     }
 
     const clean = out.replace(/[*_#`]/g, '').trim();
-    if (clean.length <= 3 || !isUrduScript(clean)) {
-      return readback(a.extraction) + phrase('didnt_catch').ur;
+    const scriptOk = a.lang === 'en' ? /[A-Za-z]/.test(clean) : isUrduScript(clean);
+    if (clean.length <= 3 || !scriptOk) {
+      const p = phrase('didnt_catch');
+      return a.lang === 'en'
+        ? readbackEn(a.extraction) + p.en
+        : readback(a.extraction) + p.ur;
     }
     return clean;
   } catch {
@@ -388,6 +430,9 @@ async function afterTurn(a: {
         kind: 'symptom',
         summaryUr: `پچھلی بار آپ نے بتایا تھا کہ ${SYMPTOM_UR[s] ?? s} ہو رہا ہے۔ اب کیسا ہے؟`,
         summaryEn: `Reported ${s.replace(/_/g, ' ')} — check whether it persists`,
+        // What the patient actually hears in English mode; summaryEn is the
+        // clinician note and reads wrong when spoken to a patient.
+        summaryEnPatient: `Last time you told me about ${SYMPTOM_EN[s] ?? s.replace(/_/g, ' ')}. How is it now?`,
         detail: { code: s },
         followUpAt: new Date(Date.now() + days * 86_400_000),
       });
@@ -398,6 +443,7 @@ async function afterTurn(a: {
           patientId: a.patientId, kind: 'trend',
           summaryUr: 'آپ کی شوگر کئی دن سے زیادہ چل رہی ہے — کیا ڈاکٹر سے بات ہوئی؟',
           summaryEn: 'Sustained high readings — confirm doctor contact',
+          summaryEnPatient: 'Your sugar has been high for several days — were you able to speak to your doctor?',
           detail: { code: 'sustained_high' },
           followUpAt: new Date(Date.now() + 2 * 86_400_000),
         });
@@ -407,6 +453,7 @@ async function afterTurn(a: {
           patientId: a.patientId, kind: 'adherence',
           summaryUr: 'دوا کچھ دن رہ گئی تھی — کیا اب وقت پر لے رہے ہیں؟',
           summaryEn: 'Missed doses — check adherence',
+          summaryEnPatient: 'You had missed your medicine for a few days — are you taking it on time now?',
           detail: { code: 'adherence' },
           followUpAt: new Date(Date.now() + 2 * 86_400_000),
         });
@@ -426,22 +473,39 @@ async function afterTurn(a: {
 // Greeting — where memory becomes agency
 // ─────────────────────────────────────────────────────────────────────────
 
-export async function greeting(patientId: string): Promise<{ textUr: string; concerns: Concern[] }> {
+/** The English a patient should hear, falling back to the clinician note. */
+function patientLine(c: Concern): string {
+  const p = (c.detail as { en_patient?: string } | null)?.en_patient;
+  return p ?? c.summary_en ?? c.summary_ur;
+}
+
+export async function greeting(patientId: string, lang: Lang = 'ur'): Promise<{ textUr: string; concerns: Concern[] }> {
   const [facts, features, concerns] = await Promise.all([
     getProfile(patientId), longitudinal(patientId), dueConcerns(patientId),
   ]);
-  const name = fact(facts, 'name') as string | undefined;
+  // A Nastaliq name inside an English sentence reads awkwardly; use the
+  // transliteration when we have one.
+  const name = ((lang === 'en' ? fact(facts, 'name_en') : undefined) ?? fact(facts, 'name')) as string | undefined;
 
-  // Templated fallback that is already good — the model only polishes it.
-  const parts: string[] = [name ? `السلام علیکم ${name}!` : 'السلام علیکم!'];
-  if (concerns[0]) parts.push(concerns[0].summary_ur);
-  else if (features.risingFastingDays >= 3) parts.push(`آپ کی صبح کی شوگر ${features.risingFastingDays} دن سے بڑھ رہی ہے۔ رات کا کھانا جلدی کر کے دیکھیں۔`);
-  else if (features.adherenceStreakDays >= 3) parts.push(`بہت اچھا، آپ ${features.adherenceStreakDays} دن سے دوا وقت پر لے رہے ہیں۔`);
-  else if (features.daysSinceLastReading !== null && features.daysSinceLastReading >= 2) parts.push('کچھ دن سے شوگر چیک نہیں ہوئی۔ آج ضرور چیک کریں۔');
-  else parts.push('آج شوگر کتنی تھی یا طبیعت کیسی ہے؟');
   // Deliberately templated, not model-written. The opening line is spoken
   // before the patient has said anything, so there is no context to ground a
   // model in — and in testing the character model padded it with invented
-  // words. The template is correct Urdu and already carries the memory.
+  // words. The template already carries the memory, which is the point.
+  const parts: string[] = [];
+  if (lang === 'en') {
+    parts.push(name ? `Hello ${name}!` : 'Hello!');
+    if (concerns[0]) parts.push(patientLine(concerns[0]));
+    else if (features.risingFastingDays >= 3) parts.push(`Your morning sugar has been rising for ${features.risingFastingDays} days. Try eating dinner a little earlier.`);
+    else if (features.adherenceStreakDays >= 3) parts.push(`Well done — you have taken your medicine on time for ${features.adherenceStreakDays} days.`);
+    else if (features.daysSinceLastReading !== null && features.daysSinceLastReading >= 2) parts.push('You have not checked your sugar for a few days. Please check today.');
+    else parts.push('What was your sugar today, and how are you feeling?');
+  } else {
+    parts.push(name ? `السلام علیکم ${name}!` : 'السلام علیکم!');
+    if (concerns[0]) parts.push(concerns[0].summary_ur);
+    else if (features.risingFastingDays >= 3) parts.push(`آپ کی صبح کی شوگر ${features.risingFastingDays} دن سے بڑھ رہی ہے۔ رات کا کھانا جلدی کر کے دیکھیں۔`);
+    else if (features.adherenceStreakDays >= 3) parts.push(`بہت اچھا، آپ ${features.adherenceStreakDays} دن سے دوا وقت پر لے رہے ہیں۔`);
+    else if (features.daysSinceLastReading !== null && features.daysSinceLastReading >= 2) parts.push('کچھ دن سے شوگر چیک نہیں ہوئی۔ آج ضرور چیک کریں۔');
+    else parts.push('آج شوگر کتنی تھی یا طبیعت کیسی ہے؟');
+  }
   return { textUr: parts.join(' '), concerns };
 }

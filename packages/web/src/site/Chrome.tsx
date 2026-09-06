@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link } from '../router.tsx';
+import { t } from '../i18n.ts';
 
 const LINKS = [
   { h: '/#how', t: 'How it works' },
@@ -11,7 +12,7 @@ const LINKS = [
   { h: '/#faq', t: 'FAQ' },
 ];
 
-export function Nav({ path }: { path: string }) {
+export function Nav({ path, onLang }: { path: string; onLang?: () => void }) {
   const [open, setOpen] = useState(false);
   const inApp = path !== '/';
   return (
@@ -29,6 +30,9 @@ export function Nav({ path }: { path: string }) {
           </nav>
         )}
         <div className="nav__cta">
+          {inApp && onLang && (
+            <button className="btn btn--ghost btn--sm" onClick={onLang} title="switch language">{t().langLabel}</button>
+          )}
           {inApp
             ? <Link className="btn btn--outline btn--sm" to="/">← Site</Link>
             : <Link className="btn btn--primary btn--sm" to="/app">Web demo</Link>}

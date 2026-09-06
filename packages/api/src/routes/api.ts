@@ -27,6 +27,12 @@ export async function apiRoutes(app: FastifyInstance): Promise<void> {
     return { id: row.id };
   });
 
+  /** Cheap validity check: a cached browser id can outlive the row. */
+  app.get<{ Params: { id: string } }>('/api/patients/:id/exists', async (req) => {
+    const row = await one(`SELECT 1 FROM patients WHERE id = $1`, [req.params.id]).catch(() => undefined);
+    return { exists: !!row };
+  });
+
   app.get<{ Params: { id: string } }>('/api/patients/:id/summary', async (req, reply) => {
     const p = await one(`SELECT id, display_name, caregiver_name, caregiver_phone, created_at FROM patients WHERE id=$1`, [req.params.id]);
     if (!p) return reply.code(404).send({ error: 'not found' });
@@ -71,17 +77,19 @@ export async function apiRoutes(app: FastifyInstance): Promise<void> {
   });
 
   /** Memory-driven opening line for today. */
-  app.get<{ Params: { id: string } }>('/api/patients/:id/greeting', async (req) => {
-    const g = await greeting(req.params.id);
+  app.get<{ Params: { id: string }; Querystring: { lang?: 'ur' | 'en' } }>('/api/patients/:id/greeting', async (req) => {
+    const g = await greeting(req.params.id, req.query.lang ?? 'ur');
     return { textUr: g.textUr, concerns: g.concerns };
   });
 
   /** Text-channel turn (typed input, tests, and the demo script). */
-  app.post<{ Params: { id: string }; Body: { text: string } }>('/api/patients/:id/turn', async (req, reply) => {
+  app.post<{ Params: { id: string }; Body: { text: string; lang?: 'ur' | 'en' } }>('/api/patients/:id/turn', async (req, reply) => {
     const text = (req.body?.text ?? '').trim();
     if (!text) return reply.code(400).send({ error: 'text required' });
+    const exists = await one(`SELECT 1 FROM patients WHERE id = $1`, [req.params.id]);
+    if (!exists) return reply.code(404).send({ error: 'unknown patient', code: 'PATIENT_NOT_FOUND' });
     const sessionId = await ensureSession(req.params.id, 'api');
-    const r = await respond({ patientId: req.params.id, sessionId, userTextUr: text, channel: 'api' });
+    const r = await respond({ patientId: req.params.id, sessionId, userTextUr: text, channel: 'api', lang: req.body?.lang ?? 'ur' });
     return {
       replyUr: r.replyUr, severity: r.severity, findings: r.findings,
       extraction: r.extraction, alertId: r.alertId,
@@ -96,11 +104,13 @@ export async function apiRoutes(app: FastifyInstance): Promise<void> {
   }));
 
   /** Raw 24 kHz PCM for a line of Urdu — used for the greeting. */
-  app.get<{ Querystring: { text?: string; voice?: string } }>('/api/tts', async (req, reply) => {
+  app.get<{ Querystring: { text?: string; voice?: string; lang?: 'ur' | 'en' } }>('/api/tts', async (req, reply) => {
     const text = (req.query.text ?? '').slice(0, 600);
     if (!text) return reply.code(400).send({ error: 'text required' });
     if (!process.env.AZURE_SPEECH_KEY) return reply.code(503).send({ error: 'tts not configured' });
-    const pcm = await speakUrdu(text, { voice: req.query.voice });
+    // The voice is chosen from lang inside azure-tts; an ur-PK voice reading
+    // English is as wrong as the reverse.
+    const pcm = await speakUrdu(text, { voice: req.query.voice, lang: req.query.lang });
     return reply.header('Content-Type', 'application/octet-stream').send(pcm);
   });
 

@@ -8,7 +8,7 @@ import { chat, parseJson, MODELS } from '../llm/qwen.ts';
 import { upsertFact, type UpsertOutcome } from './engine.ts';
 
 export const PROFILE_KEYS = [
-  'name', 'age', 'gender', 'diabetes_type', 'diagnosis_year',
+  'name', 'name_en', 'age', 'gender', 'diabetes_type', 'diagnosis_year',
   'medications', 'insulin', 'comorbidities', 'allergies',
   'roti_per_meal', 'diet_habits', 'fasts_in_ramzan', 'exercise', 'smoking',
   'work', 'caregiver', 'literacy', 'lives_with', 'doctor', 'glucometer',
