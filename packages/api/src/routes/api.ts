@@ -163,5 +163,9 @@ export async function apiRoutes(app: FastifyInstance): Promise<void> {
     return reply.code(200).send('ok'); // Meta retries anything slower than ~a few seconds
   });
 
-  app.get('/api/whatsapp/status', async () => ({ configured: whatsappConfigured() }));
+  app.get('/api/whatsapp/status', async () => ({
+    configured: whatsappConfigured(),
+    // The number patients message. Shown on the landing page and encoded in the QR.
+    number: process.env.WHATSAPP_DISPLAY_NUMBER || null,
+  }));
 }
