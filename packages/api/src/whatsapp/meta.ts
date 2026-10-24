@@ -191,18 +191,8 @@ async function handleMessage(m: WaMessage, profileName?: string): Promise<void> 
     await sendText(m.from, r.replyUr);
     await sendVoice(m.from, r.replyUr);
 
-    if (r.severity === 'red') {
-      const p = await one<{ caregiver_phone: string | null; display_name: string | null }>(
-        `SELECT caregiver_phone, display_name FROM patients WHERE id=$1`, [patientId],
-      );
-      if (p?.caregiver_phone) {
-        const who = p.display_name ?? m.from;
-        await sendText(
-          p.caregiver_phone.replace(/\D/g, ''),
-          `⚠️ SehatSaathi alert: ${who} — ${r.findings[0]?.reasonEn ?? 'emergency'}\n${r.findings[0]?.reasonUr ?? ''}\nCall them now. Emergency: 1122`,
-        ).catch(() => undefined);
-      }
-    }
+    // Emergency alerts to the doctor and family are sent from respond(), so
+    // they go out the same way whichever channel the patient used.
   } catch (err) {
     await sendText(m.from, phrase('error').ur).catch(() => undefined);
     await q(`INSERT INTO sessions (patient_id, voice_plan, ended_at) VALUES ($1,'wa-error',now())`, [patientId]).catch(() => undefined);

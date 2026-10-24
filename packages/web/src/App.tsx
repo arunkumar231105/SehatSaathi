@@ -7,6 +7,11 @@ import Timeline from './screens/Timeline.tsx';
 import Memory from './screens/Memory.tsx';
 import Plan from './screens/Plan.tsx';
 import Medicines from './screens/Medicines.tsx';
+import MyCare from './screens/MyCare.tsx';
+import Login from './site/Login.tsx';
+import Portal from './portal/Portal.tsx';
+import { LiveLayer } from './portal/live.tsx';
+import { useMe } from './auth.ts';
 import Care from './screens/Care.tsx';
 import Preflight from './screens/Preflight.tsx';
 import { getPatientId, get, getLang, setLang } from './api.ts';
@@ -18,7 +23,7 @@ const APP_NAV = (s: ReturnType<typeof t>): { p: string; label: string; icon: Ico
   { p: '/app/plan', label: s.tabPlan, icon: 'plan' },
   { p: '/app/meds', label: s.tabMeds, icon: 'pill' },
   { p: '/app/timeline', label: s.tabRecord, icon: 'chart' },
-  { p: '/app/memory', label: s.tabMemory, icon: 'brain' },
+  { p: '/app/care', label: s.tabCare, icon: 'users' },
 ];
 
 export default function App() {
@@ -26,6 +31,12 @@ export default function App() {
   const [pid, setPid] = useState<string | null>(null);
   const [caregiverPhone, setCaregiverPhone] = useState<string | null>(null);
   const [, setTick] = useState(0);   // re-render the whole app on a language change
+  const me = useMe();
+  // A signed-in patient always sees their own record, on any device.
+  const accountPid = me.user?.role === 'patient' ? me.user.patientId : null;
+  useEffect(() => {
+    if (accountPid && accountPid !== pid) { localStorage.setItem('sehat.patientId', accountPid); setPid(accountPid); }
+  }, [accountPid]);
 
   const inApp = path.startsWith('/app');
   const [pidFailed, setPidFailed] = useState(false);
@@ -45,6 +56,8 @@ export default function App() {
 
   let body: React.ReactNode;
   if (path === '/') body = <Landing />;
+  else if (path === '/login') body = <Login />;
+  else if (path === '/portal') body = <Portal />;
   else if (path === '/care') body = <Care />;
   else if (path === '/preflight') body = <Preflight />;
   else if (inApp) {
@@ -58,6 +71,7 @@ export default function App() {
     } else if (!pid) body = <section className="screen"><Skeleton /></section>;
     else if (path === '/app/plan') body = <Plan patientId={pid} />;
     else if (path === '/app/meds') body = <Medicines patientId={pid} />;
+    else if (path === '/app/care') body = <MyCare onPatient={(id) => id !== pid && setPid(id)} />;
     else if (path === '/app/timeline') body = <Timeline patientId={pid} />;
     else if (path === '/app/memory') body = <Memory patientId={pid} onPatientChange={setPid} />;
     else body = <Talk patientId={pid} caregiverPhone={caregiverPhone} />;
@@ -67,6 +81,7 @@ export default function App() {
     <div className={`app ${inApp ? 'app--patient' : ''} ${inApp ? `app--${getLang()}` : ''}`}>
       <Nav path={path} onLang={() => { setLang(getLang() === 'en' ? 'ur' : 'en'); setTick((n) => n + 1); }} />
       <main className="main" id="main">{body}</main>
+      <LiveLayer />
       {inApp && (
         <nav className="tabs" dir={dir()} aria-label="App">
           <div className="tabs__in">

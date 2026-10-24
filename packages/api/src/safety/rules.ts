@@ -116,6 +116,19 @@ export const RULES: Rule[] = [
       has(s, 'nausea', 'vomiting', 'abdominal_pain', 'rapid_breathing', 'fruity_breath'),
   },
   {
+    // Listed before the >300 rule so its stronger instruction is the one
+    // spoken: at this level "call your doctor" is not enough.
+    id: 'RED_EXTREME_HYPERGLYCAEMIA',
+    severity: 'red',
+    phraseKey: 'extreme_high',
+    reasonUr:
+      'آپ کی شوگر انتہائی زیادہ ہے۔ ابھی قریبی ہسپتال جائیں یا 1122 پر کال کریں۔ انتظار کے دوران پانی پیتے رہیں، اور خود سے کوئی اضافی دوا نہ لیں۔',
+    reasonEn: 'Blood glucose 400 mg/dL or above — extreme hyperglycaemia, hospital assessment needed.',
+    patientEn:
+      'Your sugar is extremely high. Go to the nearest hospital now or call 1122. Keep sipping water while you wait, and do not take any extra medicine on your own.',
+    test: (s) => s.glucoseMgDl !== undefined && s.glucoseMgDl >= 400,
+  },
+  {
     id: 'RED_SEVERE_HYPERGLYCAEMIA',
     severity: 'red',
     phraseKey: 'severe_high',

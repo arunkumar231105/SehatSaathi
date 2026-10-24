@@ -48,6 +48,21 @@ check('DKA: 280 with vomiting', { glucoseMgDl: 280, symptoms: ['vomiting'] },
 check('severe hyperglycaemia at 340', { glucoseMgDl: 340, symptoms: [] },
   { severity: 'red', ruleId: 'RED_SEVERE_HYPERGLYCAEMIA' });
 
+check('extreme hyperglycaemia at 500 — hospital, not just "call your doctor"', { glucoseMgDl: 500, symptoms: [] },
+  { severity: 'red', ruleId: 'RED_EXTREME_HYPERGLYCAEMIA' });
+
+{
+  // The spoken instruction comes from the FIRST red finding, so order matters.
+  const r = triage({ glucoseMgDl: 500, symptoms: [] });
+  const first = r.findings.find((f) => f.severity === 'red')?.ruleId;
+  if (first === 'RED_EXTREME_HYPERGLYCAEMIA') { passed++; console.log('  PASS  at 500 the hospital instruction is the one spoken'); }
+  else { failed++; console.log(`  FAIL  at 500 the hospital instruction is the one spoken
+        first red was ${first}`); }
+}
+
+check('340 is severe but not extreme', { glucoseMgDl: 340, symptoms: [] },
+  { severity: 'red', ruleId: 'RED_SEVERE_HYPERGLYCAEMIA' });
+
 check('chest pain alone, no reading', { symptoms: ['chest_pain'] },
   { severity: 'red', ruleId: 'RED_CARDIOVASCULAR' });
 

@@ -32,6 +32,7 @@ import { bus } from '../bus.ts';
 import { identify } from '../meds/reference.ts';
 import { medicineChecks } from '../meds/checks.ts';
 import { checkInput, card } from '../meds/service.ts';
+import { notifyEmergency } from '../portal/notify.ts';
 
 export type Channel = 'web' | 'whatsapp' | 'api';
 export type Lang = 'ur' | 'en';
@@ -200,7 +201,13 @@ export async function respond(args: {
     const rb = lang === 'en' ? readbackEn(extraction) : readback(extraction);
     const p = phrase(primary.phraseKey);
     replyUr = rb + (lang === 'en' ? p.en : p.ur);
-    if (caregiverPhone?.caregiver_phone) {
+    // Tell the patient help is coming — the doctor and family on their care
+    // team are alerted below, the legacy single caregiver number too.
+    const team = await one<{ n: number }>(`SELECT count(*)::int AS n FROM care_team WHERE patient_id=$1`, [patientId]);
+    if ((team?.n ?? 0) > 0) {
+      const n = phrase('team_notified');
+      replyUr += ' ' + (lang === 'en' ? n.en : n.ur);
+    } else if (caregiverPhone?.caregiver_phone) {
       const n = phrase('caregiver_notified');
       replyUr += ' ' + (lang === 'en' ? n.en : n.ur);
     }
@@ -211,6 +218,9 @@ export async function respond(args: {
 
     alertId = await insertAlert(patientId, patientTurnId, primary);
     clearIntake(sessionId);   // an emergency ends the questioning
+    // Off the reply's path: the patient hears the instruction without waiting
+    // for WhatsApp sends to the whole care team.
+    setImmediate(() => { void notifyEmergency(patientId, primary, userTextUr).catch((err) => console.error('emergency notify failed', err)); });
   } else {
     const name = ((lang === 'en' ? fact(facts, 'name_en') : undefined) ?? fact(facts, 'name') ?? caregiverPhone?.display_name ?? undefined) as string | undefined;
     const amber = result.findings.filter((f) => f.severity === 'amber');
@@ -502,6 +512,22 @@ async function generateReply(a: {
   );
 
   ctx.push('Clinical picture:\n- ' + describeFeatures(a.features).join('\n- '));
+
+  // What their own doctor has assigned through the doctor portal. These are
+  // the doctor's words — the companion reminds and explains, never changes them.
+  const orders = await q<{ kind: string; title: string; detail: string | null; dose: string | null; schedule: string | null; due_at: string | null }>(
+    `SELECT kind, title, detail, dose, schedule, due_at FROM care_orders WHERE patient_id=$1 AND status='active' ORDER BY created_at DESC LIMIT 8`,
+    [a.patientId],
+  ).catch(() => []);
+  if (orders.length) {
+    ctx.push(
+      "FROM THEIR DOCTOR (assigned in the doctor portal — remind them of these when relevant, never change them):\n- " +
+        orders.map((o) => {
+          const when = o.due_at ? ` on ${new Date(o.due_at).toLocaleString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', hour: 'numeric', minute: '2-digit' })}` : '';
+          return `${o.kind}: ${[o.title, o.dose, o.schedule].filter(Boolean).join(' ')}${when}${o.detail ? ` — ${o.detail}` : ''}`;
+        }).join('\n- '),
+    );
+  }
 
   // Deterministic, data-driven actions. The model may phrase these warmly but
   // must not invent additions — this is what keeps advice concrete and still

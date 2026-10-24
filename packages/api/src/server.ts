@@ -7,6 +7,8 @@ import { voiceRoutes } from './routes/voice-ws.ts';
 import { warmClips } from './safety/clips.ts';
 import { ingest } from './rag/kb.ts';
 import { startScheduler } from './scheduler.ts';
+import { migrate } from './db/migrate.ts';
+import { portalRoutes } from './routes/portal.ts';
 
 const PORT = Number(process.env.PORT ?? 3000);
 
@@ -67,7 +69,11 @@ app.get('/api/health/ws', async () => {
   });
 });
 
+// Additive, idempotent — creates the portal tables on an existing database.
+await migrate();
+
 await app.register(apiRoutes);
+await app.register(portalRoutes);
 await app.register(voiceRoutes);
 
 await app.listen({ port: PORT, host: HOST });

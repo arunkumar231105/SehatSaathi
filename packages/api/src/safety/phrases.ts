@@ -30,6 +30,10 @@ const EXTRA: Record<string, Phrase> = {
     ur: 'میں نے آپ کے گھر والوں کو اطلاع بھیج دی ہے۔',
     en: 'I have notified your family contact.',
   },
+  team_notified: {
+    ur: 'میں نے آپ کے ڈاکٹر اور گھر والوں کو فوراً اطلاع بھیج دی ہے۔',
+    en: 'I have alerted your doctor and your family right away.',
+  },
   refusal_dose: {
     ur: 'دوا کی مقدار بدلنا صرف آپ کے ڈاکٹر کا فیصلہ ہے۔ میں آپ کی بات ان تک پہنچانے میں مدد کر سکتی ہوں۔',
     en: 'Changing a dose is your doctor’s decision. I can help you take this to them.',

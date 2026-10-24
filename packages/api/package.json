@@ -9,7 +9,9 @@
     "test:safety": "tsx scripts/test-safety.ts",
     "test:intake": "tsx scripts/test-intake.ts",
     "test:meds": "tsx scripts/test-meds.ts",
+    "test:portal": "tsx scripts/test-portal.ts",
     "seed": "tsx scripts/seed.ts",
+    "seed:portals": "tsx scripts/seed-portals.ts",
     "typecheck": "tsc --noEmit",
     "test:voice": "tsx scripts/test-urdu-voice.ts"
   },

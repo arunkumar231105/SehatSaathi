@@ -21,6 +21,7 @@
 import cron from 'node-cron';
 import { q } from './db/client.ts';
 import { sendText, sendVoice, whatsappConfigured } from './whatsapp/meta.ts';
+import { notify } from './portal/notify.ts';
 
 interface Due {
   id: string;
@@ -96,7 +97,29 @@ function mark(id: string, field: 'notified_at' | 'deferred_at'): Promise<unknown
   );
 }
 
+/** Appointments and tests due in the next 24 hours: remind the patient and their family once. */
+export async function runAppointmentReminders(): Promise<number> {
+  const due = await q<{ id: string; patient_id: string; kind: string; title: string; due_at: string; doctor: string }>(
+    `SELECT o.id, o.patient_id, o.kind, o.title, o.due_at, u.name AS doctor
+     FROM care_orders o JOIN users u ON u.id = o.doctor_id
+     WHERE o.kind IN ('appointment','test') AND o.status='active' AND o.reminded_at IS NULL
+       AND o.due_at > now() AND o.due_at <= now() + interval '24 hours'
+     LIMIT 50`,
+  ).catch(() => []);
+  for (const o of due) {
+    const when = new Date(o.due_at).toLocaleString('en-GB', { weekday: 'long', hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Karachi' });
+    await notify({
+      patientId: o.patient_id, audience: 'everyone', kind: 'appointment', severity: 'info',
+      title: `Reminder: ${o.title} — ${when}`, body: `Assigned by Dr. ${o.doctor.replace(/^dr\.?\s*/i, '')}`,
+      whatsappText: `SehatSaathi یاد دہانی: ${o.title} — ${when}\nReminder: ${o.title} — ${when}`,
+    });
+    await q(`UPDATE care_orders SET reminded_at = now() WHERE id=$1`, [o.id]);
+  }
+  return due.length;
+}
+
 export function startScheduler(): void {
+  cron.schedule('0 * * * *', () => { void runAppointmentReminders(); }, { timezone: 'Asia/Karachi' });
   // Every 30 minutes, 08:00–21:00 Pakistan time — no 3 a.m. check-ins.
   cron.schedule('*/30 8-21 * * *', () => { void runFollowUps(); }, { timezone: 'Asia/Karachi' });
 }

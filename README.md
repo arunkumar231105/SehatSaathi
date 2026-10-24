@@ -87,23 +87,23 @@ $ npm run test:intake
 
 ## Safety: the model never makes the medical call
 
-[`safety/rules.ts`](packages/api/src/safety/rules.ts) is a table of **11 deterministic rules** evaluated over extracted values and clinical history. Whether a situation is an emergency is decided in code, not in a prompt. The language model's job is warmth and Urdu fluency; triage is not its job.
+[`safety/rules.ts`](packages/api/src/safety/rules.ts) is a table of **12 deterministic rules** evaluated over extracted values and clinical history. Whether a situation is an emergency is decided in code, not in a prompt. The language model's job is warmth and Urdu fluency; triage is not its job.
 
 **RED — bypasses the model entirely:**
 - Blood glucose < 70 mg/dL (hypoglycaemia)
 - \> 250 mg/dL with vomiting, abdominal pain or rapid breathing (possible DKA)
-- \> 300 mg/dL
+- \> 300 mg/dL — and at 400 or above, *go to hospital now*
 - Chest pain, one-sided weakness, slurred speech, sudden vision loss, confusion
 - Foot ulcer, non-healing wound, spreading redness
 - Any abnormal reading in pregnancy
 
-A red finding produces a **fixed phrase** played from a **pre-rendered audio clip** — so an emergency instruction never depends on a live TTS call — writes an `alerts` row with the `rule_id` that fired, pushes it to the caregiver dashboard over SSE, and WhatsApps the family contact.
+A red finding produces a **fixed phrase** played from a **pre-rendered audio clip** — so an emergency instruction never depends on a live TTS call — writes an `alerts` row with the `rule_id` that fired, and alerts **everyone on the patient's care team** — their doctor and family — in the portals within a second, with the patient's own words, plus WhatsApp where Meta allows it. The patient is told help has been called.
 
 **The agent will never** prescribe, name a medicine to start, change or suggest a dose, or tell a patient to stop a medicine. Asked anyway, it explains *why* the decision needs bloodwork and offers to help prepare the question for the doctor — it never leaves the patient with nothing.
 
 ```console
 $ npm run test:safety
-  19 passed, 0 failed
+  22 passed, 0 failed
 ```
 
 Including the cases that matter: *one high reading is not a sustained trend*, and *red always dominates a concurrent amber*.
@@ -125,6 +125,31 @@ Every output points toward the doctor; a test fails the build if any patient-fac
 ```console
 $ npm run test:meds
   32 passed, 0 failed
+```
+
+---
+
+## Three portals, one record
+
+The patient, their doctor and their family each sign in to see the same care, from their side.
+
+| Portal | What it does |
+|---|---|
+| **Doctor** (`/portal`) | Patients sorted with emergencies and the highest sugar first. Each patient's last **3 months**: monthly mean and time in range, a 13-week chart, an **estimated HbA1c** (GMI, Bergenstal 2018) and a stage, and whether they are **improving, stable or worsening**. Assigns **medicines, instructions, appointments and tests** — each reaches the patient and family at once, and the companion reminds the patient of them in conversation. |
+| **Family** (`/portal`) | The same record, read-only, for the person they look after. Alerted the moment there is an emergency, and can mark it handled so the rest of the team knows. |
+| **Patient** (*My care* in the app) | The doctor's instructions and appointments (ticked off when done), their own 3-month progress in Urdu, and who is on their care team. |
+
+**Access is the patient's choice.** A doctor or relative connects only with the 6-letter code on the patient's *My care* screen; the patient can remove anyone, or make a new code. A patient who already talks to the bot on WhatsApp keeps their whole history when they create an account with the same number.
+
+**Emergencies reach everyone.** *"Sugar 500 hai aur bohat sar dard hai"* → the rules engine fires, the patient is told to go to hospital now and that their doctor and family have been alerted, and a red banner (with sound) appears on every care-team member's screen with the patient's words and a one-tap call. Appointment and test reminders go out the day before.
+
+Notifications are always delivered in the portals; WhatsApp is attempted too and the outcome is recorded on each one, because Meta only delivers free-form messages to someone who has messaged the bot in the last 24 hours.
+
+**Try it:** the sign-in page has one-tap demo buttons for a doctor, a family member and the demo patient. The demo accounts have random passwords and can only be entered that way (`DEMO_LOGINS=off` disables them). Passwords are scrypt-hashed; sessions are HttpOnly cookies.
+
+```console
+$ npm run test:portal
+  24 passed, 0 failed
 ```
 
 ---
@@ -218,6 +243,7 @@ git clone <repo> /opt/sehatsaathi && cd /opt/sehatsaathi
 cp .env.example .env          # fill in the keys and DOMAIN
 docker compose up -d --build
 docker compose exec api npm run seed     # 14-day demo patient + knowledge base
+docker compose exec api npm run seed:portals   # demo doctor/family/patient accounts, 3 months of history
 ```
 
 Four containers: `web` (React, `127.0.0.1:8100`), `api` (Fastify, `127.0.0.1:8101`), `db` (Postgres + pgvector, `127.0.0.1:5433`). Nothing binds to a public interface — TLS is terminated by a host nginx, so the stack coexists with whatever else is on the box. See [`deploy/nginx-sehatsaathi.conf`](deploy/nginx-sehatsaathi.conf); the `Upgrade`/`Connection` headers and the raised `proxy_read_timeout` there are both load-bearing for the voice socket.
@@ -241,7 +267,8 @@ curl -X POST -H "Authorization: Bearer $TOKEN" \
 
 ```bash
 curl -s https://<domain>/api/health        # db · Model Studio · asr · tts · whatsapp
-docker compose exec api npm run test:safety            # 19 rule tests
+docker compose exec api npm run test:safety            # 22 rule tests
+docker compose exec api npm run test:portal            # 24 progress and account tests
 docker compose exec api npm run test:intake            # 19 follow-up question tests
 docker compose exec api npm run test:meds              # 32 medicine reference and check tests
 docker compose exec api npm run test:voice -- --loop   # Urdu TTS → Whisper round trip
@@ -261,7 +288,7 @@ packages/api/src/
                   extract.ts     strict JSON clinical extraction
   memory/         engine.ts      the four tiers: storage, recall, derived features
                   extractor.ts   async profile-delta extraction
-  safety/         rules.ts       11 deterministic triage rules
+  safety/         rules.ts       12 deterministic triage rules
                   phrases.ts     fixed Urdu/English wording
                   clips.ts       pre-rendered emergency audio
   voice/          cascade.ts     Whisper → brain → Azure  (active)

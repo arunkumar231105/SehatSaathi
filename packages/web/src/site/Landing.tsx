@@ -243,17 +243,22 @@ export default function Landing() {
         <div className="wrap two">
           <div className="prose">
             <span className="eyebrow">For families and clinics</span>
-            <h2>A dashboard that lights up when it matters.</h2>
+            <h2>A portal for the doctor. A portal for the family.</h2>
             <p>
               Diabetes in Pakistan is managed by families. A son in Karachi, a daughter-in-law in the next room.
               The caregiver dashboard shows every patient at a glance — last reading, open follow-ups, and emergency
               alerts pushed live the moment a rule fires — with one-tap WhatsApp and a direct line to 1122.
             </p>
             <p>
-              Clinicians see the clinical picture in English: 7-day mean, time-in-range, dawn-phenomenon flags,
-              adherence, and the exact words the patient used.
+              The doctor follows each patient’s last three months — monthly averages, time in range, an estimated
+              HbA1c and whether things are improving — and assigns medicines, instructions, appointments and tests
+              that reach the patient and family at once. A patient connects them with a 6-letter code, so access is
+              always their choice. In an emergency, everyone on the care team is alerted in seconds.
             </p>
-            <Link className="btn btn--primary" to="/care">Open the caregiver dashboard <Icon name="arrowRight" size={18} /></Link>
+            <div className="row-btns">
+              <Link className="btn btn--primary" to="/login">Try the doctor & family portals <Icon name="arrowRight" size={18} /></Link>
+              <Link className="btn btn--outline" to="/care">Live alert dashboard</Link>
+            </div>
           </div>
           <DashMock />
         </div>

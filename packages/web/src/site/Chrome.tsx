@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react';
 import { Link } from '../router.tsx';
 import { t } from '../i18n.ts';
 import { Icon } from '../ui/Icon.tsx';
+import { useMe, logout, homeFor } from '../auth.ts';
+import { NotificationBell } from '../portal/live.tsx';
+import { navigate } from '../router.tsx';
 
 const REPO = 'https://github.com/arunkumar231105/SehatSaathi';
 
@@ -41,6 +44,9 @@ export function Nav({ path, onLang }: { path: string; onLang?: () => void }) {
   const onSite = path === '/';
   const inPatientApp = path.startsWith('/app');
   const active = useActiveSection(onSite);
+  const me = useMe();
+  const signedIn = !!me.user;
+  const inPortal = path === '/portal';
 
   useEffect(() => {
     const on = () => setScrolled(window.scrollY > 8);
@@ -82,10 +88,19 @@ export function Nav({ path, onLang }: { path: string; onLang?: () => void }) {
               <Icon name="globe" size={16} /> {t().langLabel}
             </button>
           )}
-          {!onSite && !inPatientApp && path !== '/care' && <Link className="btn btn--ghost btn--sm" to="/care">Dashboard</Link>}
+          {signedIn && <NotificationBell />}
+          {signedIn && !inPortal && me.user!.role !== 'patient' && <Link className="btn btn--ghost btn--sm" to="/portal">My portal</Link>}
+          {signedIn && inPortal && (
+            <button className="btn btn--ghost btn--sm" onClick={async () => { await logout(); navigate('/login'); }}>
+              <span className="nav__hide-sm">{me.user!.name.split(' ').slice(0, 2).join(' ')} · </span>Sign out
+            </button>
+          )}
+          {!signedIn && (onSite || path === '/care') && <Link className="btn btn--ghost btn--sm nav__hide-sm" to="/login">Sign in</Link>}
           {path === '/care' && <Link className="btn btn--ghost btn--sm nav__hide-sm" to="/app">Patient app</Link>}
           {onSite
-            ? <Link className="btn btn--primary btn--sm" to="/app">Try the demo <Icon name="arrowRight" size={16} /></Link>
+            ? (signedIn
+                ? <Link className="btn btn--primary btn--sm" to={homeFor(me.user!.role)}>Open my portal <Icon name="arrowRight" size={16} /></Link>
+                : <Link className="btn btn--primary btn--sm" to="/app">Try the demo <Icon name="arrowRight" size={16} /></Link>)
             : <Link className="btn btn--outline btn--sm" to="/"><Icon name="arrowLeft" size={16} /> <span className="nav__hide-sm">Website</span></Link>}
           {onSite && (
             <button className="burger" aria-label={open ? 'Close menu' : 'Open menu'} aria-expanded={open}
@@ -114,7 +129,7 @@ export function Footer() {
         </div>
         <div>
           <b>Try it</b>
-          <Link to="/app">Patient web app</Link><Link to="/care">Caregiver dashboard</Link><Link to="/preflight">System status</Link>
+          <Link to="/app">Patient web app</Link><Link to="/login">Doctor & family portals</Link><Link to="/care">Caregiver dashboard</Link><Link to="/preflight">System status</Link>
         </div>
         <div>
           <b>Project</b>
