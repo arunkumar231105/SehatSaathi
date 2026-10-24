@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from '../router.tsx';
 import { Icon, type IconName } from '../ui/Icon.tsx';
+import { useReveal, useCountUp } from './motion.ts';
 
 interface WaStatus { configured: boolean; number?: string | null }
 
@@ -11,10 +12,12 @@ export default function Landing() {
   useEffect(() => {
     fetch('/api/whatsapp/status').then((r) => r.json()).then(setWa).catch(() => undefined);
   }, []);
+  const page = useRef<HTMLDivElement>(null);
+  useReveal(page);
   const waHref = wa.number ? `https://wa.me/${wa.number.replace(/\D/g, '')}?text=${WA_TEXT}` : '#whatsapp';
 
   return (
-    <div className="site">
+    <div className="site" ref={page}>
       {/* ── Hero ─────────────────────────────────────────────────────── */}
       <section className="hero">
         <div className="wrap hero__grid">
@@ -330,7 +333,9 @@ export default function Landing() {
 /* ── pieces ──────────────────────────────────────────────────────────── */
 
 function Stat({ n, l }: { n: string; l: string }) {
-  return <div className="stat"><div className="stat__n">{n}</div><div className="stat__l">{l}</div></div>;
+  const [ref, shown] = useCountUp(n);
+  // The real value stays readable to screen readers while the digits animate.
+  return <div className="stat" ref={ref}><div className="stat__n" aria-label={n}><span aria-hidden>{shown}</span></div><div className="stat__l">{l}</div></div>;
 }
 
 /** Play button + the words, so the clip is understandable without sound too. */
@@ -416,7 +421,7 @@ function VoiceNote({ len, mine = true }: { len: string; mine?: boolean }) {
   return (
     <div className={`vn ${mine ? '' : 'vn--in'}`}>
       <span className="vn__play">▶</span>
-      <span className="vn__wave">{Array.from({ length: 22 }, (_, i) => <i key={i} style={{ height: `${6 + ((i * 7) % 14)}px` }} />)}</span>
+      <span className="vn__wave">{Array.from({ length: 22 }, (_, i) => <i key={i} style={{ height: `${6 + ((i * 7) % 14)}px`, ['--i' as string]: i }} />)}</span>
       <span className="vn__len">{len}</span>
     </div>
   );

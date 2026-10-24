@@ -596,6 +596,50 @@ circle.dot { stroke: #fff; stroke-width: 1.5; }
 .app--patient.app--en .act__do, .app--patient.app--en .act__why, .app--patient.app--en .act__tag, .app--patient.app--en .disclaimer, .app--patient.app--en .kpi__l { font-family: var(--font); line-height: 1.5; }
 .app--patient.app--en .act__why { margin-top: .3rem; }
 
+/* ── motion ──────────────────────────────────────────────────────────── */
+/* Scroll reveal: the hiding class is only ever added by JS (site/motion.ts). */
+.reveal { opacity: 0; transform: translateY(22px); transition: opacity .6s cubic-bezier(.2,.7,.2,1) var(--d, 0ms), transform .6s cubic-bezier(.2,.7,.2,1) var(--d, 0ms); }
+.reveal.is-in { opacity: 1; transform: none; }
+
+/* hero: copy arrives in sequence, the phone floats */
+.hero__copy > * { animation: heroIn .7s cubic-bezier(.2,.7,.2,1) both; }
+.hero__copy > :nth-child(2) { animation-delay: .08s; }
+.hero__copy > :nth-child(3) { animation-delay: .16s; }
+.hero__copy > :nth-child(4) { animation-delay: .24s; }
+.hero__copy > :nth-child(5) { animation-delay: .32s; }
+@keyframes heroIn { from { opacity: 0; transform: translateY(18px); } }
+.hl { background-size: 0% 100%; background-repeat: no-repeat; background-image: linear-gradient(transparent 62%, rgba(143,224,207,.55) 62%); background-color: transparent; animation: underline .9s .55s cubic-bezier(.2,.7,.2,1) forwards; }
+@keyframes underline { to { background-size: 100% 100%; } }
+.phone { animation: phoneIn .9s .2s cubic-bezier(.2,.7,.2,1) both, float 6s 1.2s ease-in-out infinite; }
+.phone:hover { animation-play-state: running, paused; }
+@keyframes phoneIn { from { opacity: 0; transform: translateY(30px) rotate(4deg); } }
+@keyframes float { 0%, 100% { transform: translateY(0) rotate(1.5deg); } 50% { transform: translateY(-10px) rotate(.5deg); } }
+.vn__wave i { transform-origin: center; animation: wave 1.4s ease-in-out infinite; animation-delay: calc(var(--i, 0) * -90ms); }
+@keyframes wave { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(.45); } }
+.pill-badge__dot { animation: live 2s infinite; }
+
+/* buttons and icons */
+.btn--primary .ico:last-child { transition: transform .2s; }
+.btn--primary:hover .ico:last-child { transform: translateX(3px); }
+.step__i, .tier__i, .whocard__i { transition: transform .25s, background .25s, color .25s; }
+.step:hover .step__i, .tier:hover .tier__i, .whocard:hover .whocard__i { transform: scale(1.08) rotate(-4deg); background: var(--teal); color: #fff; }
+.stat__n { font-variant-numeric: tabular-nums; }
+
+/* patient app: each screen eases in, the active tab icon bounces */
+.app--patient .screen, .app--patient .transcript, .care, .preflight { animation: screenIn .35s cubic-bezier(.2,.7,.2,1) both; }
+@keyframes screenIn { from { opacity: 0; transform: translateY(10px); } }
+.tabs__a--on .tabs__i { animation: tabPop .35s cubic-bezier(.3,1.6,.5,1); }
+@keyframes tabPop { 40% { transform: translateY(-3px) scale(1.15); } }
+.mic--idle { animation: breathe 3s ease-in-out infinite; }
+@keyframes breathe { 50% { box-shadow: 0 14px 30px -8px rgba(11,110,95,.6), 0 0 0 14px rgba(11,110,95,.07); } }
+.act, .fact, .med, .kpi, .day { animation: rise .4s cubic-bezier(.2,.7,.2,1) both; }
+.act:nth-child(2), .fact:nth-child(2), .med:nth-child(2), .kpi:nth-child(2) { animation-delay: .05s; }
+.act:nth-child(3), .fact:nth-child(3), .med:nth-child(3), .kpi:nth-child(3) { animation-delay: .1s; }
+.act:nth-child(n+4), .fact:nth-child(n+4), .med:nth-child(n+4), .kpi:nth-child(n+4) { animation-delay: .15s; }
+.act__tick { transition: background .15s, border-color .15s, transform .15s; }
+.act__tick:active { transform: scale(.88); }
+.progress__bar span { transition: width .5s cubic-bezier(.2,.7,.2,1); }
+
 /* respect people who turn motion off */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
