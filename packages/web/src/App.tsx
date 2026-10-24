@@ -10,12 +10,13 @@ import Care from './screens/Care.tsx';
 import Preflight from './screens/Preflight.tsx';
 import { getPatientId, get, getLang, setLang } from './api.ts';
 import { t, dir } from './i18n.ts';
+import { Icon, Skeleton, type IconName } from './ui/Icon.tsx';
 
-const APP_NAV = (s: ReturnType<typeof t>) => [
-  { p: '/app', label: s.tabTalk, icon: '🎤' },
-  { p: '/app/plan', label: s.tabPlan, icon: '✅' },
-  { p: '/app/timeline', label: s.tabRecord, icon: '📈' },
-  { p: '/app/memory', label: s.tabMemory, icon: '🧠' },
+const APP_NAV = (s: ReturnType<typeof t>): { p: string; label: string; icon: IconName }[] => [
+  { p: '/app', label: s.tabTalk, icon: 'mic' },
+  { p: '/app/plan', label: s.tabPlan, icon: 'plan' },
+  { p: '/app/timeline', label: s.tabRecord, icon: 'chart' },
+  { p: '/app/memory', label: s.tabMemory, icon: 'brain' },
 ];
 
 export default function App() {
@@ -43,7 +44,7 @@ export default function App() {
   else if (path === '/care') body = <Care />;
   else if (path === '/preflight') body = <Preflight />;
   else if (inApp) {
-    if (!pid) body = <div className="loading">…</div>;
+    if (!pid) body = <section className="screen"><Skeleton /></section>;
     else if (path === '/app/plan') body = <Plan patientId={pid} />;
     else if (path === '/app/timeline') body = <Timeline patientId={pid} />;
     else if (path === '/app/memory') body = <Memory patientId={pid} onPatientChange={setPid} />;
@@ -53,14 +54,16 @@ export default function App() {
   return (
     <div className={`app ${inApp ? 'app--patient' : ''} ${inApp ? `app--${getLang()}` : ''}`}>
       <Nav path={path} onLang={() => { setLang(getLang() === 'en' ? 'ur' : 'en'); setTick((n) => n + 1); }} />
-      <main className="main">{body}</main>
+      <main className="main" id="main">{body}</main>
       {inApp && (
-        <nav className="tabs" dir={dir()}>
-          {APP_NAV(t()).map((n) => (
-            <Link key={n.p} to={n.p} className={path === n.p ? 'tabs__a tabs__a--on' : 'tabs__a'}>
-              <span className="tabs__i">{n.icon}</span><span className="tabs__t">{n.label}</span>
-            </Link>
-          ))}
+        <nav className="tabs" dir={dir()} aria-label="App">
+          <div className="tabs__in">
+            {APP_NAV(t()).map((n) => (
+              <Link key={n.p} to={n.p} current={path === n.p} className={path === n.p ? 'tabs__a tabs__a--on' : 'tabs__a'}>
+                <span className="tabs__i"><Icon name={n.icon} size={22} /></span><span className="tabs__t">{n.label}</span>
+              </Link>
+            ))}
+          </div>
         </nav>
       )}
       {!inApp && <Footer />}
@@ -69,5 +72,12 @@ export default function App() {
 }
 
 function NotFound() {
-  return <section className="screen center" style={{ padding: '6rem 1rem' }}><h2>Page not found</h2><Link className="btn btn--primary" to="/">Back to SehatSaathi</Link></section>;
+  return (
+    <section className="screen center notfound">
+      <div className="notfound__code">404</div>
+      <h2>Page not found</h2>
+      <p className="muted">That page does not exist. The companion is still here.</p>
+      <div className="row-btns row-btns--center"><Link className="btn btn--primary" to="/">Back to SehatSaathi</Link><Link className="btn btn--outline" to="/app">Open the app</Link></div>
+    </section>
+  );
 }

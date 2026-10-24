@@ -18,12 +18,12 @@ export function navigate(to: string): void {
   window.scrollTo({ top: 0 });
 }
 
-export function Link({ to, className, children, onClick }: { to: string; className?: string; children: ReactNode; onClick?: () => void }) {
+export function Link({ to, className, children, onClick, current }: { to: string; className?: string; children: ReactNode; onClick?: () => void; current?: boolean }) {
   const go = (e: MouseEvent<HTMLAnchorElement>) => {
     if (e.metaKey || e.ctrlKey || to.startsWith('http') || to.startsWith('#')) return;
     e.preventDefault();
     onClick?.();
     navigate(to);
   };
-  return <a href={to} className={className} onClick={go}>{children}</a>;
+  return <a href={to} className={className} onClick={go} aria-current={current ? 'page' : undefined}>{children}</a>;
 }

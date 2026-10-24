@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from '../router.tsx';
+import { Icon, type IconName } from '../ui/Icon.tsx';
 
 interface WaStatus { configured: boolean; number?: string | null }
 
@@ -18,8 +19,8 @@ export default function Landing() {
       <section className="hero">
         <div className="wrap hero__grid">
           <div className="hero__copy">
-            <span className="eyebrow">Voice-first diabetes companion · Pakistan</span>
-            <h1>Diabetes care that speaks Urdu — and remembers you.</h1>
+            <span className="pill-badge"><span className="pill-badge__dot" /> Voice-first diabetes companion · Pakistan</span>
+            <h1>Diabetes care that <span className="hl">speaks Urdu</span> — and remembers you.</h1>
             <p className="lead">
               SehatSaathi is a WhatsApp voice companion for the 33 million people living with diabetes in Pakistan.
               Send a voice note in Urdu. Get clear, spoken guidance in your own language — from a companion that
@@ -31,7 +32,11 @@ export default function Landing() {
               </a>
               <Link className="btn btn--outline btn--lg" to="/app">Try the web demo</Link>
             </div>
-            <p className="fine">Free to use · No app to install · Works on any phone with WhatsApp</p>
+            <ul className="trust">
+              <li><Icon name="check" size={16} /> Free for patients</li>
+              <li><Icon name="check" size={16} /> No app to install</li>
+              <li><Icon name="check" size={16} /> Emergencies go to a human</li>
+            </ul>
           </div>
 
           <PhoneMock />
@@ -77,11 +82,11 @@ export default function Landing() {
           <span className="eyebrow">How it works</span>
           <h2>Speak. Be understood. Be remembered.</h2>
           <div className="steps">
-            <Step n="1" t="Send a voice note" d="On WhatsApp, in everyday Urdu — mixed with English words like “sugar” and “check” is fine. “Aaj sugar 250 thi, chakkar aa rahe hain.”" />
-            <Step n="2" t="It understands the clinical facts" d="The reading, its context (fasting or after a meal), symptoms, what you ate, whether you took your medicine — extracted into structured data, never guessed." />
-            <Step n="3" t="Safety rules decide first" d="A deterministic rules engine checks for emergencies before any AI writes a word. Dangerous values trigger fixed instructions and alert your family." />
-            <Step n="4" t="A spoken reply, in your history’s context" d="Uzma — a native Pakistani Urdu voice — replies in two or three short sentences, reading your number back and grounding advice in what it knows about you." />
-            <Step n="5" t="It follows up on its own" d="Mentioned numb feet last week? It asks how they are. Missed doses? It checks in. Memory that produces care, not just recall." />
+            <Step n="1" icon="mic" t="Send a voice note" d="On WhatsApp, in everyday Urdu — mixed with English words like “sugar” and “check” is fine. “Aaj sugar 250 thi, chakkar aa rahe hain.”" />
+            <Step n="2" icon="activity" t="It understands the clinical facts" d="The reading, its context (fasting or after a meal), symptoms, what you ate, whether you took your medicine — extracted into structured data, never guessed." />
+            <Step n="3" icon="shield" t="Safety rules decide first" d="A deterministic rules engine checks for emergencies before any AI writes a word. Dangerous values trigger fixed instructions and alert your family." />
+            <Step n="4" icon="speaker" t="A spoken reply, in your history’s context" d="Uzma — a native Pakistani Urdu voice — replies in two or three short sentences, reading your number back and grounding advice in what it knows about you." />
+            <Step n="5" icon="bell" t="It follows up on its own" d="Mentioned numb feet last week? It asks how they are. Missed doses? It checks in. Memory that produces care, not just recall." />
           </div>
         </div>
       </section>
@@ -134,10 +139,10 @@ export default function Landing() {
           </p>
 
           <div className="tiers">
-            <Tier icon="💬" t="Episodic" d="Every conversation, searchable by meaning. “That medicine you mentioned last time” resolves correctly." />
-            <Tier icon="🪪" t="Profile" d="Structured facts — diagnosis, medicines, how many rotis, whether you fast in Ramzan — each with a confidence score and its source." />
-            <Tier icon="📈" t="Longitudinal" d="Your readings over time: time-in-range, morning-sugar trends, which foods spike you, whether doses are being missed." />
-            <Tier icon="🔔" t="Open concerns" d="Symptoms you reported, contradictions it noticed, trends worth watching — each with a date to bring it up again." />
+            <Tier icon="message" t="Episodic" d="Every conversation, searchable by meaning. “That medicine you mentioned last time” resolves correctly." />
+            <Tier icon="idCard" t="Profile" d="Structured facts — diagnosis, medicines, how many rotis, whether you fast in Ramzan — each with a confidence score and its source." />
+            <Tier icon="chart" t="Longitudinal" d="Your readings over time: time-in-range, morning-sugar trends, which foods spike you, whether doses are being missed." />
+            <Tier icon="bell" t="Open concerns" d="Symptoms you reported, contradictions it noticed, trends worth watching — each with a date to bring it up again." />
           </div>
 
           <div className="dialogue">
@@ -167,7 +172,7 @@ export default function Landing() {
             </p>
           </div>
           <div className="rules">
-            <div className="rules__h">Escalates immediately</div>
+            <div className="rules__h"><Icon name="alert" size={18} /> Escalates immediately</div>
             <ul>
               <li>Blood sugar below 70 mg/dL — hypoglycaemia</li>
               <li>Above 250 with vomiting, abdominal pain or rapid breathing — possible DKA</li>
@@ -176,7 +181,7 @@ export default function Landing() {
               <li>Foot wounds, ulcers or spreading redness</li>
               <li>Any abnormal reading in pregnancy</li>
             </ul>
-            <div className="rules__h">Will never</div>
+            <div className="rules__h"><Icon name="x" size={18} /> Will never</div>
             <ul>
               <li>Prescribe, change or suggest a dose</li>
               <li>Diagnose a condition</li>
@@ -201,7 +206,7 @@ export default function Landing() {
             <Shot src="/shots/memory.png" t="What I know about you" d="Every fact, with the sentence it was learned from — and what it still wants to ask." />
             <Shot src="/shots/timeline.png" t="Your record" d="Readings, meals, medicines and symptoms in one colour-coded history." />
           </div>
-          <Link className="btn btn--outline" to="/app">Open the web app</Link>
+          <Link className="btn btn--primary" to="/app">Open the web app <Icon name="arrowRight" size={18} /></Link>
         </div>
       </section>
 
@@ -212,17 +217,17 @@ export default function Landing() {
           <h2>Three people, one thread of care.</h2>
           <div className="who">
             <Who
-              icon="🧕"
+              icon="user"
               t="The patient"
               d="Speaks Urdu, may not read well, sees a doctor rarely. Gets spoken guidance grounded in their own history, and is told plainly when something needs a doctor today."
             />
             <Who
-              icon="👨"
+              icon="users"
               t="The family member"
               d="Usually the one who notices something is wrong. Gets an alert the moment a dangerous reading is logged, with the patient's own words and a one-tap way to reach them."
             />
             <Who
-              icon="🩺"
+              icon="stethoscope"
               t="The clinician"
               d="Sees a structured English summary instead of a vague history: time-in-range, morning trends, adherence, and which foods precede spikes — in the minutes an appointment actually lasts."
             />
@@ -245,7 +250,7 @@ export default function Landing() {
               Clinicians see the clinical picture in English: 7-day mean, time-in-range, dawn-phenomenon flags,
               adherence, and the exact words the patient used.
             </p>
-            <Link className="btn btn--outline" to="/care">Open the caregiver dashboard</Link>
+            <Link className="btn btn--primary" to="/care">Open the caregiver dashboard <Icon name="arrowRight" size={18} /></Link>
           </div>
           <DashMock />
         </div>
@@ -343,9 +348,11 @@ function Clip({ src, label, ur, en, danger }: { src: string; label: string; ur: 
   };
   return (
     <div className={`clip ${danger ? 'clip--danger' : ''}`}>
-      <button className="clip__btn" onClick={toggle} aria-label={`play ${label}`}>{playing ? '■' : '▶'}</button>
+      <button className={`clip__btn ${playing ? 'clip__btn--on' : ''}`} onClick={toggle} aria-label={playing ? `Stop ${label}` : `Play ${label}`} aria-pressed={playing}>
+        <Icon name={playing ? 'stop' : 'play'} size={18} />
+      </button>
       <div className="clip__body">
-        <div className="clip__label">{label}</div>
+        <div className="clip__label">{label}{playing && <span className="eq" aria-hidden><i /><i /><i /></span>}</div>
         <div className="clip__ur" dir="rtl" lang="ur">{ur}</div>
         <div className="clip__en">{en}</div>
       </div>
@@ -363,14 +370,14 @@ function Shot({ src, t, d }: { src: string; t: string; d: string }) {
   );
 }
 
-function Who({ icon, t, d }: { icon: string; t: string; d: string }) {
-  return <div className="whocard"><div className="whocard__i">{icon}</div><h3>{t}</h3><p>{d}</p></div>;
+function Who({ icon, t, d }: { icon: IconName; t: string; d: string }) {
+  return <div className="whocard"><div className="whocard__i"><Icon name={icon} size={26} /></div><h3>{t}</h3><p>{d}</p></div>;
 }
-function Step({ n, t, d }: { n: string; t: string; d: string }) {
-  return <div className="step"><div className="step__n">{n}</div><h3>{t}</h3><p>{d}</p></div>;
+function Step({ n, icon, t, d }: { n: string; icon: IconName; t: string; d: string }) {
+  return <div className="step"><div className="step__top"><span className="step__i"><Icon name={icon} size={22} /></span><span className="step__n">Step {n}</span></div><h3>{t}</h3><p>{d}</p></div>;
 }
-function Tier({ icon, t, d }: { icon: string; t: string; d: string }) {
-  return <div className="tier"><div className="tier__i">{icon}</div><h3>{t}</h3><p>{d}</p></div>;
+function Tier({ icon, t, d }: { icon: IconName; t: string; d: string }) {
+  return <div className="tier"><div className="tier__i"><Icon name={icon} size={22} /></div><h3>{t}</h3><p>{d}</p></div>;
 }
 function Bubble({ who, ur, en }: { who: 'patient' | 'agent'; ur: string; en: string }) {
   return (
@@ -419,7 +426,7 @@ function VoiceNote({ len, mine = true }: { len: string; mine?: boolean }) {
 function DashMock() {
   return (
     <div className="dash" aria-hidden>
-      <div className="dash__red">🚨 1 unacknowledged emergency alert</div>
+      <div className="dash__red"><Icon name="alert" size={16} /> 1 unacknowledged emergency alert</div>
       <div className="dash__pt"><span dir="rtl">راشدہ بی بی</span><span>55 mg/dL · now</span><span className="dash__tag dash__tag--red">1 red</span></div>
       <div className="dash__pt"><span dir="rtl">محمد اسلم</span><span>142 mg/dL · 1d</span><span className="dash__tag">2 follow-ups</span></div>
       <div className="dash__alert">

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useVoice, type VoiceState } from '../voice/useVoice.ts';
 import { t, dir, lang } from '../i18n.ts';
+import { Icon } from '../ui/Icon.tsx';
 
 export default function Talk({ patientId, caregiverPhone }: { patientId: string; caregiverPhone?: string | null }) {
   const v = useVoice(patientId);
@@ -71,18 +72,26 @@ export default function Talk({ patientId, caregiverPhone }: { patientId: string;
       <div className="transcript" ref={listRef} dir={dir()}>
         {v.turns.length === 0 && (
           <div className="hint">
-            <p>{s.hintLead}</p>
+            <div className="hint__av" aria-hidden>ص</div>
+            <p className="hint__lead">{s.hintLead}</p>
             <p className="hint__ex">{s.hintExample}</p>
-            <button className="btn btn--ghost" onClick={v.greet}>{s.listen}</button>
+            <button className="btn btn--outline" onClick={v.greet}><Icon name="speaker" size={18} /> {s.listen.replace('🔊 ', '')}</button>
+            <p className="hint__try">{s.tryOne}</p>
+            <div className="chips">
+              {s.examples.map((ex) => (
+                <button key={ex} className="chip" onClick={() => void v.sendText(ex)} disabled={v.state === 'connecting'}>{ex}</button>
+              ))}
+            </div>
           </div>
         )}
         {v.turns.map((turn, i) => (
           <div key={i} className={`bubble bubble--${turn.role}`}>{turn.text}</div>
         ))}
+        {v.state === 'thinking' && <div className="bubble bubble--agent bubble--typing" aria-label={s.thinking}><i /><i /><i /></div>}
         {v.severity === 'amber' && v.findings[0] && (
-          <div className="amber">⚠ {lang() === 'en' ? v.findings[0].reasonEn : v.findings[0].reasonUr}</div>
+          <div className="amber" role="status"><Icon name="alert" size={18} /> {lang() === 'en' ? v.findings[0].reasonEn : v.findings[0].reasonUr}</div>
         )}
-        {v.error && <div className="err">{s.error}: {v.error}</div>}
+        {v.error && <div className="err" role="alert">{v.error === 'connection' ? s.connErr : `${s.error}: ${v.error}`}</div>}
       </div>
 
       <div className="talk__controls">
@@ -94,16 +103,16 @@ export default function Talk({ patientId, caregiverPhone }: { patientId: string;
           onPointerLeave={(e) => holding.current && up(e)}
           onContextMenu={(e) => e.preventDefault()}
           disabled={v.state === 'connecting'}
-          aria-label="hold to talk"
+          aria-label={LABEL[v.state]}
         >
           <span className="mic__icon">
-            {v.state === 'listening' ? '●' : v.state === 'speaking' ? '🔊' : v.state === 'thinking' ? '…' : '🎤'}
+            {v.state === 'speaking' ? <Icon name="speaker" size={38} /> : v.state === 'thinking' ? <span className="mic__dots"><i /><i /><i /></span> : <Icon name="mic" size={38} />}
           </span>
         </button>
-        <div className="mic__label">{LABEL[v.state]}</div>
+        <div className={`mic__label mic__label--${v.state}`} aria-live="polite">{LABEL[v.state]}</div>
 
-        <button className="link" onClick={() => setShowType((x) => !x)}>
-          {showType ? s.close : s.typeInstead}
+        <button className="link link--icon" onClick={() => setShowType((x) => !x)} aria-expanded={showType}>
+          <Icon name={showType ? 'close' : 'keyboard'} size={16} /> {showType ? s.close : s.typeInstead}
         </button>
         {showType && (
           <form className="typebar" onSubmit={submit}>
@@ -114,7 +123,7 @@ export default function Talk({ patientId, caregiverPhone }: { patientId: string;
               dir={dir()}
               autoFocus
             />
-            <button className="btn btn--primary" type="submit" disabled={!typed.trim()}>{s.send}</button>
+            <button className="btn btn--primary" type="submit" disabled={!typed.trim()} aria-label={s.send}><Icon name="send" size={18} /></button>
           </form>
         )}
         {!v.caps.tts && v.state !== 'connecting' && <div className="note">{s.noTts}</div>}

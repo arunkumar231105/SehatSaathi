@@ -58,6 +58,11 @@ const UR = {
   demoPatient: 'ڈیمو مریض (راشدہ بی بی)',
   newPatient: 'نیا مریض شروع کریں',
   langLabel: 'English',
+  tryOne: 'یا ان میں سے ایک بھیجیں:',
+  connErr: 'سرور سے رابطہ نہیں ہو سکا۔ انٹرنیٹ چیک کریں اور دوبارہ کوشش کریں۔',
+  examples: ['آج صبح خالی پیٹ شوگر 160 تھی', 'رات کو بریانی کھائی، اب شوگر 240 ہے', 'میں نے آج دوائی نہیں لی', 'میرے پاؤں سن ہو رہے ہیں'],
+  planSub: 'آپ کی اپنی ریڈنگز سے بنایا گیا ہے — عام مشورہ نہیں۔',
+  planProgress: (d: number, n: number) => `آج ${n} میں سے ${d} مکمل`,
   medsTaken: 'دوا لی',
   medsMissed: 'دوا رہ گئی',
 } as const;
@@ -108,6 +113,11 @@ const EN: Record<keyof typeof UR, unknown> = {
   demoPatient: 'Demo patient (Rashida Bibi)',
   newPatient: 'Start a new patient',
   langLabel: 'اردو',
+  tryOne: 'Or send one of these:',
+  connErr: 'Could not reach the server. Check your internet and try again.',
+  examples: ['My fasting sugar was 160 this morning', 'Had biryani last night, sugar is 240 now', 'I forgot my medicine today', 'My feet feel numb'],
+  planSub: 'Built from your own readings — not general advice.',
+  planProgress: (d: number, n: number) => `${d} of ${n} done today`,
   medsTaken: 'Medicine taken',
   medsMissed: 'Medicine missed',
 };

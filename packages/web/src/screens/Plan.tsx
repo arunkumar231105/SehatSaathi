@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { get, getLang } from '../api.ts';
 import { t as tr, lang } from '../i18n.ts';
+import { Icon, Skeleton, type IconName } from '../ui/Icon.tsx';
 
 interface Action {
   category: 'movement' | 'food' | 'medicine' | 'monitoring' | 'feet' | 'doctor';
@@ -10,8 +11,8 @@ interface Action {
 }
 interface Data { text: string; actions: Action[] }
 
-const ICON: Record<Action['category'], string> = {
-  movement: '🚶', food: '🍽', medicine: '💊', monitoring: '🩸', feet: '🦶', doctor: '🩺',
+const ICON: Record<Action['category'], IconName> = {
+  movement: 'walk', food: 'food', medicine: 'pill', monitoring: 'drop', feet: 'foot', doctor: 'stethoscope',
 };
 const LABEL_UR: Record<Action['category'], string> = {
   movement: 'چہل قدمی', food: 'کھانا', medicine: 'دوا', monitoring: 'شوگر چیک', feet: 'پاؤں', doctor: 'ڈاکٹر',
@@ -49,9 +50,10 @@ export default function Plan({ patientId }: { patientId: string }) {
     } catch { /* private mode */ }
   };
 
-  if (!d) return <div className="loading">{s.loading}</div>;
+  if (!d) return <section className="screen"><Skeleton /></section>;
 
   const top = d.actions.slice(0, 6);
+  const doneCount = [...done].filter((i) => i < top.length).length;
   const speak = () => {
     const a = new Audio(`/api/tts?lang=${getLang()}&text=${encodeURIComponent(d.text)}`);
     void a.play().catch(() => undefined);
@@ -59,12 +61,16 @@ export default function Plan({ patientId }: { patientId: string }) {
 
   return (
     <section className="screen">
-      <h2>{en ? 'Your plan this week' : 'اس ہفتے کا منصوبہ'}</h2>
-      <p className="muted">
-        {en
-          ? 'Built from your own readings — not general advice.'
-          : 'آپ کی اپنی ریڈنگز سے بنایا گیا ہے — عام مشورہ نہیں۔'}
-      </p>
+      <header className="screen__head">
+        <h2>{en ? 'Your plan this week' : 'اس ہفتے کا منصوبہ'}</h2>
+        <p className="muted">{s.planSub}</p>
+        {top.length > 0 && (
+          <div className="progress" role="progressbar" aria-valuemin={0} aria-valuemax={top.length} aria-valuenow={doneCount}>
+            <div className="progress__bar"><span style={{ width: `${(100 * doneCount) / top.length}%` }} /></div>
+            <span className="progress__t">{s.planProgress(doneCount, top.length)}</span>
+          </div>
+        )}
+      </header>
 
       {top.length === 0 && (
         <div className="card">
@@ -81,11 +87,11 @@ export default function Plan({ patientId }: { patientId: string }) {
             onClick={() => toggle(i)}
             aria-label={done.has(i) ? 'undo' : 'mark done'}
           >
-            {done.has(i) ? '✓' : ''}
+            {done.has(i) && <Icon name="check" size={18} />}
           </button>
           <div className="act__body">
             <div className="act__tag">
-              <span className="act__i">{ICON[a.category]}</span>
+              <Icon name={ICON[a.category]} size={14} />
               {(en ? LABEL_EN : LABEL_UR)[a.category]}
             </div>
             <div className="act__do">{en ? a.doEn : a.doUr}</div>
@@ -95,12 +101,12 @@ export default function Plan({ patientId }: { patientId: string }) {
       ))}
 
       {top.length > 0 && (
-        <button className="btn btn--primary" onClick={speak} style={{ marginTop: '.6rem' }}>
-          🔊 {en ? 'Listen to the plan' : 'منصوبہ سنیں'}
+        <button className="btn btn--primary btn--block" onClick={speak}>
+          <Icon name="speaker" size={18} /> {en ? 'Listen to the plan' : 'منصوبہ سنیں'}
         </button>
       )}
 
-      <p className="fine" style={{ marginTop: '1rem' }}>
+      <p className="fine disclaimer"><Icon name="shield" size={16} />{' '}
         {en
           ? 'This plan covers food, movement, routine and monitoring. It never recommends a medicine or a dose — that is your doctor’s decision.'
           : 'یہ منصوبہ کھانے، چہل قدمی، معمول اور شوگر چیک کرنے کے بارے میں ہے۔ یہ کبھی دوا یا اس کی مقدار تجویز نہیں کرتا — یہ فیصلہ آپ کے ڈاکٹر کا ہے۔'}

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { get, post, fmtDate, fmtTime, daysAgo } from '../api.ts';
+import { get, post, daysAgo } from '../api.ts';
+import { Icon, Skeleton } from '../ui/Icon.tsx';
 
 interface Alert {
   id: string; severity: 'red' | 'amber'; rule_id: string; reason_ur: string; reason_en: string;
@@ -16,20 +17,37 @@ interface Summary {
   concerns: { id: string; summary_en: string | null; summary_ur: string }[];
 }
 
+// The dashboard is English-first, so its dates are too — whatever language
+// the patient app on this device was last switched to.
+const when = (d: string) =>
+  new Date(d).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
+const ago = (d: string | null) => {
+  if (!d) return 'no readings';
+  const n = daysAgo(d);
+  return n === 0 ? 'today' : n === 1 ? 'yesterday' : `${n} days ago`;
+};
+/** Names that arrived through a broken encoding render as "????" — show something useful instead. */
+const nameOf = (p: { display_name: string | null; phone: string | null }) =>
+  p.display_name && !/^\?+$/.test(p.display_name.replace(/\s/g, '')) ? p.display_name : p.phone ?? 'Unnamed patient';
+const zone = (v: number | null) => (v == null ? '' : v < 70 ? 'low' : v <= 180 ? 'ok' : v <= 250 ? 'high' : 'vhigh');
+const keyLabel = (k: string) => k.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase());
+
 /**
  * Caregiver dashboard. English-first: the caregiver is usually a younger
  * family member with a smartphone, and clinicians read English.
  */
 export default function Care() {
-  const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [alerts, setAlerts] = useState<Alert[] | null>(null);
   const [pts, setPts] = useState<Pt[]>([]);
   const [sel, setSel] = useState<string | null>(null);
   const [sum, setSum] = useState<Summary | null>(null);
   const [flash, setFlash] = useState(false);
+  const [showAll, setShowAll] = useState(false);
 
   const load = async () => {
     const [a, p] = await Promise.all([get<Alert[]>('/api/care/alerts'), get<Pt[]>('/api/care/patients')]);
     setAlerts(a); setPts(p);
+    setSel((cur) => cur ?? p.find((x) => x.open_red)?.id ?? p[0]?.id ?? null);
   };
 
   useEffect(() => {
@@ -41,82 +59,138 @@ export default function Care() {
   }, []);
 
   useEffect(() => {
-    if (sel) void get<Summary>(`/api/patients/${sel}/summary`).then(setSum);
+    setSum(null);
+    if (sel) void get<Summary>(`/api/patients/${sel}/summary`).then(setSum).catch(() => undefined);
   }, [sel]);
 
-  const openRed = alerts.filter((a) => a.severity === 'red' && !a.acknowledged_at);
+  if (!alerts) return <section className="screen care"><Skeleton rows={3} /></section>;
+
+  const openAlerts = alerts.filter((a) => !a.acknowledged_at);
+  const openRed = openAlerts.filter((a) => a.severity === 'red');
+  const followUps = pts.reduce((n, p) => n + p.open_concerns, 0);
+  const shown = showAll ? alerts : openAlerts;
+  const selPt = pts.find((p) => p.id === sel);
 
   return (
     <section className={`screen care ${flash ? 'care--flash' : ''}`} dir="ltr">
-      <h2>Caregiver dashboard</h2>
-      <p className="muted">Live · updates instantly when a patient's turn triggers a rule</p>
+      <header className="care__head">
+        <div>
+          <h2>Caregiver dashboard</h2>
+          <p className="muted"><span className="live-dot" aria-hidden /> Live — updates the moment a patient’s message triggers a safety rule</p>
+        </div>
+      </header>
 
       {openRed.length > 0 && (
-        <div className="redbar">🚨 {openRed.length} unacknowledged emergency alert{openRed.length > 1 ? 's' : ''}</div>
+        <div className="redbar" role="alert">
+          <Icon name="alert" size={20} />
+          <span>{openRed.length} emergency alert{openRed.length > 1 ? 's' : ''} waiting for acknowledgement</span>
+          <a className="btn btn--sm btn--light" href="#alerts">Review</a>
+        </div>
       )}
 
-      <h3>Patients</h3>
-      <div className="ptgrid">
-        {pts.map((p) => (
-          <button key={p.id} className={`pt ${p.open_red ? 'pt--red' : ''} ${sel === p.id ? 'pt--sel' : ''}`} onClick={() => setSel(p.id)}>
-            <div className="pt__name" dir="rtl">{p.display_name ?? p.phone ?? 'Unnamed'}</div>
-            <div className="pt__stats">
-              <span>{p.last_mg_dl ?? '—'} mg/dL</span>
-              <span className="muted">{p.last_at ? `${daysAgo(p.last_at)}d ago` : 'no readings'}</span>
-            </div>
-            <div className="pt__flags">
-              {p.open_red > 0 && <span className="tag tag--red">{p.open_red} red</span>}
-              {p.open_concerns > 0 && <span className="tag tag--symptom">{p.open_concerns} to follow up</span>}
-            </div>
-          </button>
-        ))}
+      <div className="kpis kpis--care">
+        <div className="kpi"><span className="kpi__l"><Icon name="users" size={16} /> Patients</span><span className="kpi__n">{pts.length}</span></div>
+        <div className="kpi"><span className="kpi__l"><Icon name="alert" size={16} /> Emergencies</span><span className={`kpi__n ${openRed.length ? 'kpi__n--low' : ''}`}>{openRed.length}</span></div>
+        <div className="kpi"><span className="kpi__l"><Icon name="bell" size={16} /> Open alerts</span><span className="kpi__n">{openAlerts.length}</span></div>
+        <div className="kpi"><span className="kpi__l"><Icon name="clock" size={16} /> Follow-ups due</span><span className="kpi__n">{followUps}</span></div>
       </div>
 
-      {sel && sum && (
-        <div className="card">
-          <div className="card__h">Clinical picture</div>
-          <ul className="plain">
-            <li>7-day mean: <b>{sum.features.mean7 ?? '—'}</b> · Time-in-range (14d): <b>{sum.features.timeInRange14 ?? '—'}%</b></li>
-            {sum.features.risingFastingDays >= 3 && <li>⚠ Fasting readings rising {sum.features.risingFastingDays} days running</li>}
-            {sum.features.dawnPhenomenon && <li>⚠ Dawn phenomenon pattern</li>}
-            {sum.features.postMealSpikes7 > 0 && <li>{sum.features.postMealSpikes7} post-meal spike(s){sum.features.spikeFoods.length ? ` — after ${sum.features.spikeFoods.join(', ')}` : ''}</li>}
-            {sum.features.missedDoses7 > 0 ? <li>❌ {sum.features.missedDoses7} missed dose(s) this week</li> : <li>✅ Medication streak: {sum.features.adherenceStreakDays} days</li>}
-          </ul>
-          {sum.concerns.length > 0 && (
+      <div className="care__grid">
+        <div className="panel">
+          <h3 className="panel__h">Patients</h3>
+          {pts.length === 0 && <p className="muted">No patients yet. They appear here after their first message.</p>}
+          <div className="ptlist">
+            {pts.map((p) => (
+              <button key={p.id} className={`pt ${p.open_red ? 'pt--red' : ''} ${sel === p.id ? 'pt--sel' : ''}`} onClick={() => setSel(p.id)} aria-pressed={sel === p.id}>
+                <span className="pt__av" aria-hidden>{nameOf(p).trim().charAt(0)}</span>
+                <span className="pt__main">
+                  <span className="pt__name" dir="auto">{nameOf(p)}</span>
+                  <span className="pt__sub">Last reading {ago(p.last_at)}</span>
+                  {(p.open_red > 0 || p.open_concerns > 0) && (
+                    <span className="pt__flags">
+                      {p.open_red > 0 && <span className="tag tag--red">{p.open_red} emergency</span>}
+                      {p.open_concerns > 0 && <span className="tag tag--symptom">{p.open_concerns} follow-up{p.open_concerns > 1 ? 's' : ''}</span>}
+                    </span>
+                  )}
+                </span>
+                <span className={`pt__mg pt__mg--${zone(p.last_mg_dl)}`}>{p.last_mg_dl ?? '—'}<small>mg/dL</small></span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="panel">
+          {!selPt && <p className="muted">Select a patient to see their clinical picture.</p>}
+          {selPt && (
             <>
-              <div className="card__h">Open follow-ups</div>
-              <ul className="plain">{sum.concerns.map((c) => <li key={c.id}>{c.summary_en ?? c.summary_ur}</li>)}</ul>
+              <h3 className="panel__h"><span dir="auto">{nameOf(selPt)}</span> — clinical picture</h3>
+              {!sum ? <Skeleton rows={2} /> : (
+                <>
+                  <div className="kpis kpis--mini">
+                    <div className="kpi"><span className="kpi__l">7-day mean</span><span className={`kpi__n kpi__n--${zone(sum.features.mean7)}`}>{sum.features.mean7 ?? '—'}</span><span className="kpi__s">mg/dL</span></div>
+                    <div className="kpi"><span className="kpi__l">Time in range</span><span className="kpi__n">{sum.features.timeInRange14 ?? '—'}%</span><span className="kpi__s">14 days</span></div>
+                    <div className="kpi"><span className="kpi__l">Missed doses</span><span className={`kpi__n ${sum.features.missedDoses7 ? 'kpi__n--high' : 'kpi__n--ok'}`}>{sum.features.missedDoses7}</span><span className="kpi__s">this week</span></div>
+                  </div>
+                  <ul className="signals">
+                    {sum.features.risingFastingDays >= 3 && <li className="sig sig--warn"><Icon name="activity" size={16} /> Fasting readings rising {sum.features.risingFastingDays} days running</li>}
+                    {sum.features.dawnPhenomenon && <li className="sig sig--warn"><Icon name="clock" size={16} /> Dawn-phenomenon pattern</li>}
+                    {sum.features.postMealSpikes7 > 0 && <li className="sig sig--warn"><Icon name="food" size={16} /> {sum.features.postMealSpikes7} post-meal spike{sum.features.postMealSpikes7 > 1 ? 's' : ''}{sum.features.spikeFoods.length ? ` — after ${sum.features.spikeFoods.join(', ')}` : ''}</li>}
+                    {sum.features.missedDoses7 === 0 && <li className="sig sig--ok"><Icon name="check" size={16} /> Medication streak: {sum.features.adherenceStreakDays} days</li>}
+                  </ul>
+                  {sum.concerns.length > 0 && (
+                    <>
+                      <div className="card__h">Open follow-ups</div>
+                      <ul className="plain">{sum.concerns.map((c) => <li key={c.id}>{c.summary_en ?? c.summary_ur}</li>)}</ul>
+                    </>
+                  )}
+                  {sum.facts.length > 0 && (
+                    <>
+                      <div className="card__h">Profile</div>
+                      <dl className="facts-dl">
+                        {sum.facts.map((f) => <div key={f.key}><dt>{keyLabel(f.key)}</dt><dd dir="auto">{Array.isArray(f.value) ? f.value.join(', ') : typeof f.value === 'boolean' ? (f.value ? 'Yes' : 'No') : String(f.value)}</dd></div>)}
+                      </dl>
+                    </>
+                  )}
+                </>
+              )}
             </>
           )}
-          <div className="card__h">Profile</div>
-          <ul className="plain small">{sum.facts.map((f) => <li key={f.key}><b>{f.key}</b>: {Array.isArray(f.value) ? f.value.join(', ') : String(f.value)}</li>)}</ul>
         </div>
-      )}
+      </div>
 
-      <h3>Alerts</h3>
-      {alerts.length === 0 && <p className="muted">No alerts yet.</p>}
-      {alerts.map((a) => (
-        <div key={a.id} className={`alert alert--${a.severity} ${a.acknowledged_at ? 'alert--ack' : ''}`}>
+      <div className="alerts__head" id="alerts">
+        <h3>Alerts</h3>
+        <div className="seg" role="tablist" aria-label="Filter alerts">
+          <button role="tab" aria-selected={!showAll} className={!showAll ? 'on' : ''} onClick={() => setShowAll(false)}>Open ({openAlerts.length})</button>
+          <button role="tab" aria-selected={showAll} className={showAll ? 'on' : ''} onClick={() => setShowAll(true)}>All ({alerts.length})</button>
+        </div>
+      </div>
+      {shown.length === 0 && (
+        <div className="empty"><Icon name="check" size={22} /><span>{showAll ? 'No alerts yet.' : 'Nothing waiting — every alert has been acknowledged.'}</span></div>
+      )}
+      {shown.map((a) => (
+        <article key={a.id} className={`alert alert--${a.severity} ${a.acknowledged_at ? 'alert--ack' : ''}`}>
           <div className="alert__top">
-            <span className={`tag tag--${a.severity}`}>{a.severity.toUpperCase()}</span>
-            <b dir="rtl">{a.display_name ?? a.phone}</b>
-            <span className="muted">{fmtDate(a.created_at)} {fmtTime(a.created_at)}</span>
+            <span className={`tag tag--${a.severity}`}>{a.severity === 'red' ? 'Emergency' : 'Warning'}</span>
+            <b dir="auto">{nameOf(a)}</b>
+            <span className="muted small">{when(a.created_at)}</span>
+            {a.acknowledged_at && <span className="tag"><Icon name="check" size={12} /> Acknowledged</span>}
           </div>
           <div className="alert__en">{a.reason_en}</div>
-          <div className="alert__ur" dir="rtl">{a.reason_ur}</div>
+          <div className="alert__ur" dir="rtl" lang="ur">{a.reason_ur}</div>
           {a.trigger_text && <div className="alert__trig" dir="rtl">«{a.trigger_text}»</div>}
-          <div className="alert__meta muted small">rule: {a.rule_id}</div>
+          <div className="alert__meta muted small">Rule <code>{a.rule_id}</code></div>
           <div className="row-btns">
-            {!a.acknowledged_at && <button className="btn" onClick={() => post(`/api/care/alerts/${a.id}/ack`).then(load)}>Acknowledge</button>}
+            {!a.acknowledged_at && <button className="btn btn--sm btn--outline" onClick={() => post(`/api/care/alerts/${a.id}/ack`).then(load)}><Icon name="check" size={16} /> Acknowledge</button>}
             {a.caregiver_phone && (
-              <a className="btn btn--wa" target="_blank" rel="noreferrer"
+              <a className="btn btn--sm btn--wa" target="_blank" rel="noreferrer"
                  href={`https://wa.me/${a.caregiver_phone.replace(/\D/g, '')}?text=${encodeURIComponent(`⚠️ SehatSaathi: ${a.display_name ?? ''} — ${a.reason_en}\n${a.reason_ur}\nEmergency: 1122`)}`}>
-                WhatsApp family
+                <Icon name="message" size={16} /> WhatsApp family
               </a>
             )}
-            <a className="btn btn--danger" href="tel:1122">Call 1122</a>
+            <a className="btn btn--sm btn--danger" href="tel:1122"><Icon name="phone" size={16} /> Call 1122</a>
           </div>
-        </div>
+        </article>
       ))}
     </section>
   );

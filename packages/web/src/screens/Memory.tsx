@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { get, post, fmtDate, createPatient, useDemoPatient } from '../api.ts';
 import { t as tr, lang } from '../i18n.ts';
+import { Icon, Skeleton } from '../ui/Icon.tsx';
 
 interface Fact {
   id: string; key: string; value: unknown; confidence: number; learned_at: string;
@@ -37,30 +38,33 @@ export default function Memory({ patientId, onPatientChange }: { patientId: stri
   const load = () => get<Data>(`/api/patients/${patientId}/memory`).then(setD);
   useEffect(() => { void load(); }, [patientId]);
   const s = tr();
-  if (!d) return <div className="loading">{s.loading}</div>;
+  if (!d) return <section className="screen"><Skeleton /></section>;
 
   const active = d.facts.filter((f) => f.active);
   const old = d.facts.filter((f) => !f.active);
 
   return (
     <section className="screen">
-      <h2>{s.memoryTitle}</h2>
-      <p className="muted">{s.memoryCount(active.length, d.episodicCount)}</p>
+      <header className="screen__head">
+        <h2>{s.memoryTitle}</h2>
+        <p className="muted">{s.memoryCount(active.length, d.episodicCount)}</p>
+      </header>
 
       {d.concerns.length > 0 && (
         <div className="card card--concern">
-          <div className="card__h">{s.concernsTitle}</div>
+          <div className="card__h"><Icon name="bell" size={18} /> {s.concernsTitle}</div>
           {d.concerns.map((c) => (
             <div key={c.id} className="concern">
               <span className={`tag tag--${c.kind}`}>{(lang() === 'en' ? KIND_EN : KIND_UR)[c.kind] ?? c.kind}</span>
               <div>{lang() === 'en' ? (c.summary_en ?? c.summary_ur) : c.summary_ur}</div>
               <div className="muted small">{lang() === 'en' ? `${s.since} ${fmtDate(c.raised_at)}` : `${fmtDate(c.raised_at)} ${s.since}`}</div>
-              <button className="link" onClick={() => post(`/api/concerns/${c.id}/resolve`).then(load)}>{s.resolved}</button>
+              <button className="btn btn--sm btn--soft" onClick={() => post(`/api/concerns/${c.id}/resolve`).then(load)}><Icon name="check" size={16} /> {s.resolved}</button>
             </div>
           ))}
         </div>
       )}
 
+      <div className="facts">
       {active.map((f) => (
         <div key={f.id} className="fact">
           <div className="fact__k">{(lang() === 'en' ? KEY_EN : KEY_UR)[f.key] ?? f.key}</div>
@@ -77,6 +81,7 @@ export default function Memory({ patientId, onPatientChange }: { patientId: stri
           )}
         </div>
       ))}
+      </div>
 
       {old.length > 0 && (
         <>
@@ -94,7 +99,7 @@ export default function Memory({ patientId, onPatientChange }: { patientId: stri
       )}
 
       <div className="card">
-        <div className="card__h">{s.patient}</div>
+        <div className="card__h"><Icon name="user" size={18} /> {s.patient}</div>
         <div className="row-btns">
           <button className="btn btn--ghost" onClick={() => useDemoPatient().then(onPatientChange)}>{s.demoPatient}</button>
           <button className="btn btn--ghost" onClick={() => createPatient().then(onPatientChange)}>{s.newPatient}</button>
