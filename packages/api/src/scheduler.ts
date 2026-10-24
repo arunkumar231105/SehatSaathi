@@ -22,6 +22,7 @@ import cron from 'node-cron';
 import { q } from './db/client.ts';
 import { sendText, sendVoice, whatsappConfigured } from './whatsapp/meta.ts';
 import { notify } from './portal/notify.ts';
+import { runDoseReminders } from './meds/reminders.ts';
 
 interface Due {
   id: string;
@@ -120,6 +121,8 @@ export async function runAppointmentReminders(): Promise<number> {
 
 export function startScheduler(): void {
   cron.schedule('0 * * * *', () => { void runAppointmentReminders(); }, { timezone: 'Asia/Karachi' });
+  // Each dose slot has a 45-minute window, so a 15-minute tick never misses one.
+  cron.schedule('*/15 6-23 * * *', () => { void runDoseReminders().catch((e) => console.error('dose reminders failed', e)); }, { timezone: 'Asia/Karachi' });
   // Every 30 minutes, 08:00–21:00 Pakistan time — no 3 a.m. check-ins.
   cron.schedule('*/30 8-21 * * *', () => { void runFollowUps(); }, { timezone: 'Asia/Karachi' });
 }

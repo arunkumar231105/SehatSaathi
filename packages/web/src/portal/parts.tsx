@@ -68,7 +68,7 @@ export function WeeklyChart({ weekly, lang = 'en' }: { weekly: Progress['weekly'
   );
 }
 
-export function ProgressPanel({ p, lang = 'en' }: { p: Progress; lang?: L }) {
+export function ProgressPanel({ p, lang = 'en', labA1c }: { p: Progress; lang?: L; labA1c?: { value: number; taken_on: string } | null }) {
   const en = lang === 'en';
   const MONTH_UR = ['پچھلے 30 دن', '31–60 دن پہلے', '61–90 دن پہلے'];
   return (
@@ -76,7 +76,10 @@ export function ProgressPanel({ p, lang = 'en' }: { p: Progress; lang?: L }) {
       <p className="prog__sum">{en ? p.summaryEn : p.summaryUr}</p>
       <div className="kpis kpis--4">
         <div className="kpi"><span className="kpi__l">{en ? 'Stage' : 'حالت'}</span><span className="kpi__n kpi__n--sm"><StageBadge stage={p.stage} lang={lang} /></span></div>
-        <div className="kpi"><span className="kpi__l">{en ? 'Est. HbA1c' : 'اندازاً HbA1c'}</span><span className="kpi__n">{p.estimatedA1c ?? '—'}{p.estimatedA1c !== null && <small>%</small>}</span><span className="kpi__s">GMI</span></div>
+        {labA1c
+          ? <div className="kpi kpi--lab"><span className="kpi__l">{en ? 'HbA1c (lab)' : 'HbA1c (لیب)'}</span><span className="kpi__n">{labA1c.value}<small>%</small></span>
+              <span className="kpi__s">{new Date(labA1c.taken_on).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' })}{p.estimatedA1c !== null ? ` · est. ${p.estimatedA1c}%` : ''}</span></div>
+          : <div className="kpi"><span className="kpi__l">{en ? 'Est. HbA1c' : 'اندازاً HbA1c'}</span><span className="kpi__n">{p.estimatedA1c ?? '—'}{p.estimatedA1c !== null && <small>%</small>}</span><span className="kpi__s">GMI</span></div>}
         <div className="kpi"><span className="kpi__l">{en ? 'Time in range' : 'ٹھیک حد میں'}</span><span className="kpi__n">{p.timeInRange90 ?? '—'}{p.timeInRange90 !== null && <small>%</small>}</span><span className="kpi__s">90 {en ? 'days' : 'دن'}</span></div>
         <div className="kpi"><span className="kpi__l">{en ? 'Trend' : 'رجحان'}</span><span className="kpi__n kpi__n--sm"><TrendTag trend={p.trend} lang={lang} /></span>
           {p.meanChange !== null && <span className="kpi__s">{p.meanChange > 0 ? '+' : ''}{p.meanChange} mg/dL {en ? 'vs last month' : 'پچھلے مہینے سے'}</span>}</div>

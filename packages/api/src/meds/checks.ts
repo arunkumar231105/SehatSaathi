@@ -27,6 +27,8 @@ export interface MedCheckInput {
   conditions: string[];
   /** Symptoms reported in the current conversation. */
   symptoms: SymptomCode[];
+  /** Latest kidney function from a lab result, mL/min/1.73m², if known. */
+  egfr?: number | null;
 }
 
 export interface MedCheck {
@@ -125,7 +127,22 @@ export function medicineChecks(input: MedCheckInput): { checks: MedCheck[]; know
       patientUr: 'پائیوگلیٹازون سے جسم میں پانی رک سکتا ہے، جو دل کی بیماری میں اہم ہے۔ ڈاکٹر سے پوچھیں کہ یہ آپ کے لیے ٹھیک ہے، اور ٹانگوں میں سوجن یا سانس پھولنے پر فوراً بتائیں۔',
     });
   }
-  if ((has(all, 'biguanide') || has(all, 'sglt2')) && /kidney|renal|گردے/.test(cond)) {
+  // A measured eGFR beats a free-text condition: the leaflets set hard limits.
+  if (input.egfr != null && has(all, 'biguanide') && input.egfr < 30) {
+    add({
+      id: 'METFORMIN_EGFR_BELOW_30', urgency: 'today',
+      clinicianEn: `eGFR ${input.egfr} on metformin — contraindicated below 30 (label).`,
+      patientEn: `Your latest kidney test (eGFR ${input.egfr}) is low, and metformin is not used when kidney function is this low. Please contact your doctor today about your medicines — do not change anything on your own.`,
+      patientUr: `آپ کا گردوں کا تازہ ٹیسٹ (eGFR ${input.egfr}) کم ہے، اور اتنا کم ہو تو میٹفارمن استعمال نہیں ہوتی۔ آج ہی اپنی دواؤں کے بارے میں ڈاکٹر سے رابطہ کریں — خود سے کچھ نہ بدلیں۔`,
+    });
+  } else if (input.egfr != null && has(all, 'biguanide') && input.egfr < 45) {
+    add({
+      id: 'METFORMIN_EGFR_30_45', urgency: 'review',
+      clinicianEn: `eGFR ${input.egfr} on metformin — dose review advised between 30 and 45 (label).`,
+      patientEn: `Your latest kidney test (eGFR ${input.egfr}) means your metformin dose may need checking. Ask your doctor at your next visit.`,
+      patientUr: `آپ کے گردوں کے تازہ ٹیسٹ (eGFR ${input.egfr}) کی وجہ سے میٹفارمن کی مقدار دیکھنے کی ضرورت ہو سکتی ہے۔ اگلی بار ڈاکٹر سے پوچھیں۔`,
+    });
+  } else if ((has(all, 'biguanide') || has(all, 'sglt2')) && /kidney|renal|گردے/.test(cond)) {
     add({
       id: 'KIDNEY_MONITORING', urgency: 'review',
       clinicianEn: `Kidney disease recorded with ${names(all.filter((m) => m.classId === 'biguanide' || m.classId === 'sglt2'))} — dose depends on eGFR.`,

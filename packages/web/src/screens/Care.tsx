@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { get, post, daysAgo } from '../api.ts';
 import { Icon, Skeleton } from '../ui/Icon.tsx';
+import { demoLogin, useMe } from '../auth.ts';
+import { Link } from '../router.tsx';
 
 interface Alert {
   id: string; severity: 'red' | 'amber'; rule_id: string; reason_ur: string; reason_en: string;
@@ -48,26 +50,47 @@ export default function Care() {
   const [sum, setSum] = useState<Summary | null>(null);
   const [flash, setFlash] = useState(false);
   const [showAll, setShowAll] = useState(false);
+  const [locked, setLocked] = useState(false);
+  const me = useMe();
 
   const load = async () => {
-    const [a, p] = await Promise.all([get<Alert[]>('/api/care/alerts'), get<Pt[]>('/api/care/patients')]);
+    let a: Alert[], p: Pt[];
+    try { [a, p] = await Promise.all([get<Alert[]>('/api/care/alerts'), get<Pt[]>('/api/care/patients')]); }
+    catch { setLocked(true); return; }   // signed out: patient data is for the care team only
+    setLocked(false);
     setAlerts(a); setPts(p);
     setSel((cur) => cur ?? p.find((x) => x.open_red)?.id ?? p[0]?.id ?? null);
   };
 
   useEffect(() => {
     void load();
+    if (!me.user) return;
     const es = new EventSource('/api/care/stream');
     es.addEventListener('alert', () => { setFlash(true); void load(); setTimeout(() => setFlash(false), 2500); });
     const t = setInterval(load, 30_000);
     return () => { es.close(); clearInterval(t); };
-  }, []);
+  }, [me.user?.id]);
 
   useEffect(() => {
     setSum(null);
     if (sel) void get<Summary>(`/api/patients/${sel}/summary`).then(setSum).catch(() => undefined);
   }, [sel]);
 
+  if (locked) {
+    return (
+      <section className="screen care">
+        <div className="panel empty-state">
+          <Icon name="lock" size={28} />
+          <h3>Patient data is for their care team only</h3>
+          <p>Sign in as a doctor or family member to see the live alert dashboard for your patients.</p>
+          <div className="row-btns row-btns--center">
+            <button className="btn btn--primary" onClick={async () => { await demoLogin('doctor'); void load(); }}><Icon name="sparkle" size={18} /> Open as demo doctor</button>
+            <Link className="btn btn--outline" to="/login">Sign in</Link>
+          </div>
+        </div>
+      </section>
+    );
+  }
   if (!alerts) return <section className="screen care"><Skeleton rows={3} /></section>;
 
   const openAlerts = alerts.filter((a) => !a.acknowledged_at);

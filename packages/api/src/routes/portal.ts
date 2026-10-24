@@ -187,7 +187,7 @@ export async function portalRoutes(app: FastifyInstance): Promise<void> {
     const id = req.params.id;
     if (!(await canView(u, id))) return reply.code(403).send({ error: 'You are not on this patient’s care team.' });
     const lang = req.query.lang ?? (u.role === 'patient' ? 'ur' : 'en');
-    const [p, readings, alerts, orders, team, meds, concerns] = await Promise.all([
+    const [p, readings, alerts, orders, team, meds, concerns, labs] = await Promise.all([
       one(`SELECT id, display_name, phone, created_at FROM patients WHERE id=$1`, [id]),
       q<{ mg_dl: number; taken_at: string; context: string | null }>(
         `SELECT mg_dl, taken_at, context FROM readings WHERE patient_id=$1 AND taken_at > now() - interval '90 days' ORDER BY taken_at DESC`, [id]),
@@ -198,13 +198,54 @@ export async function portalRoutes(app: FastifyInstance): Promise<void> {
       q(`SELECT u.id, u.name, u.role, u.specialty, t.relation, t.label FROM care_team t JOIN users u ON u.id=t.user_id WHERE t.patient_id=$1 ORDER BY t.relation, t.created_at`, [id]),
       medicinePicture(id, lang),
       openConcerns(id),
+      q(`SELECT l.id, l.kind, l.value::float AS value, to_char(l.taken_on, 'YYYY-MM-DD') AS taken_on, l.note, u.name AS entered_by_name
+         FROM lab_results l LEFT JOIN users u ON u.id=l.entered_by WHERE l.patient_id=$1 ORDER BY l.taken_on DESC, l.created_at DESC LIMIT 30`, [id]),
     ]);
     return {
       patient: p, progress: progress(readings), readings: readings.slice(0, 60), alerts, orders, team,
-      medicines: meds, concerns, canAssign: await isDoctorOf(u, id),
+      medicines: meds, concerns, labs, canAssign: await isDoctorOf(u, id),
+      canAddLabs: (await isDoctorOf(u, id)) || (u.role === 'patient' && u.patient_id === id),
       shareCode: u.role === 'patient' ? await shareCodeFor(id) : undefined,
     };
   });
+
+  // ── lab results ────────────────────────────────────────────────────────
+  const LABS: Record<string, { min: number; max: number; unit: string; name: string }> = {
+    hba1c: { min: 3, max: 20, unit: '%', name: 'HbA1c' },
+    egfr: { min: 1, max: 150, unit: 'mL/min/1.73m²', name: 'eGFR (kidney function)' },
+    creatinine: { min: 0.1, max: 20, unit: 'mg/dL', name: 'Creatinine' },
+    ldl: { min: 10, max: 400, unit: 'mg/dL', name: 'LDL cholesterol' },
+  };
+
+  app.post<{ Params: { id: string }; Body: { kind?: string; value?: number | string; takenOn?: string; note?: string } }>(
+    '/api/portal/patients/:id/labs',
+    async (req, reply) => {
+      const u = await requireUser(req, reply); if (!u) return;
+      const id = req.params.id;
+      // The doctor, or the patient copying from their own lab report; family view only.
+      if (!(await isDoctorOf(u, id)) && !(u.role === 'patient' && u.patient_id === id)) {
+        return reply.code(403).send({ error: 'Only the patient or their doctor can add lab results.' });
+      }
+      const spec = LABS[req.body?.kind ?? ''];
+      const value = Number(req.body?.value);
+      if (!spec) return reply.code(400).send({ error: 'Choose which test this is.' });
+      if (!Number.isFinite(value) || value < spec.min || value > spec.max) {
+        return reply.code(400).send({ error: `${spec.name} should be between ${spec.min} and ${spec.max} ${spec.unit}.` });
+      }
+      const takenOn = req.body?.takenOn && /^\d{4}-\d{2}-\d{2}$/.test(req.body.takenOn) ? req.body.takenOn : new Date().toISOString().slice(0, 10);
+      if (new Date(takenOn).getTime() > Date.now() + 86_400_000) return reply.code(400).send({ error: 'The test date cannot be in the future.' });
+      const row = await one(
+        `INSERT INTO lab_results (patient_id, kind, value, taken_on, note, entered_by) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+        [id, req.body!.kind, value, takenOn, req.body?.note?.trim() || null, u.id],
+      );
+      await notify({
+        patientId: id, audience: 'everyone', exceptUserId: u.id, kind: 'lab', severity: 'info',
+        title: `New lab result: ${spec.name} ${value}${spec.unit === '%' ? '%' : ` ${spec.unit}`}`,
+        body: `Test date ${takenOn}. Added by ${u.name}.`,
+      });
+      return { lab: row };
+    },
+  );
 
   // ── doctor's orders ────────────────────────────────────────────────────
   app.post<{ Params: { id: string }; Body: { kind?: Kind; title?: string; detail?: string; dose?: string; schedule?: string; dueAt?: string } }>(

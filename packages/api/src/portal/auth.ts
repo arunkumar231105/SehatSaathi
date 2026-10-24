@@ -131,3 +131,24 @@ export async function shareCodeFor(patientId: string): Promise<string> {
   }
   throw new Error('could not allocate share code');
 }
+
+/**
+ * Who may read or write a patient's record through the patient-app API.
+ *
+ *  - the demo patient: anyone (it is the public demo);
+ *  - a record with no account yet (an anonymous web-app device, or a
+ *    WhatsApp-only patient): whoever holds its id — ids are random UUIDs and
+ *    are no longer listed anywhere public;
+ *  - a record that belongs to an account: only that patient or their care team.
+ */
+export async function patientAccess(req: FastifyRequest, patientId: string): Promise<boolean> {
+  if (!/^[0-9a-f-]{36}$/i.test(patientId)) return false;
+  const p = await one<{ phone: string | null; claimed: boolean }>(
+    `SELECT p.phone, EXISTS (SELECT 1 FROM users u WHERE u.patient_id = p.id) AS claimed FROM patients p WHERE p.id=$1`,
+    [patientId],
+  );
+  if (!p) return true;                       // let the route answer 404 as before
+  if (p.phone === 'demo' || !p.claimed) return true;
+  const u = await currentUser(req);
+  return !!u && (await canView(u, patientId));
+}

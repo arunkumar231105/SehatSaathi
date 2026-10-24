@@ -78,7 +78,7 @@ export function Nav({ path, onLang }: { path: string; onLang?: () => void }) {
               <a key={l.id} href={`/#${l.id}`} className={active === l.id ? 'is-on' : undefined}
                  aria-current={active === l.id ? 'true' : undefined} onClick={() => setOpen(false)}>{l.t}</a>
             ))}
-            <Link to="/care" onClick={() => setOpen(false)} className="nav__links-dash">Caregiver dashboard</Link>
+            <Link to="/login" onClick={() => setOpen(false)} className="nav__links-dash">Portals</Link>
           </nav>
         )}
 

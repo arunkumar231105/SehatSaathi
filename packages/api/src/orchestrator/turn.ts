@@ -31,8 +31,9 @@ import {
 import { bus } from '../bus.ts';
 import { identify } from '../meds/reference.ts';
 import { medicineChecks } from '../meds/checks.ts';
-import { checkInput, card } from '../meds/service.ts';
+import { checkInput, card, latestLab } from '../meds/service.ts';
 import { notifyEmergency } from '../portal/notify.ts';
+import { logReminderReply } from '../meds/reminders.ts';
 
 export type Channel = 'web' | 'whatsapp' | 'api';
 export type Lang = 'ur' | 'en';
@@ -147,6 +148,20 @@ export async function respond(args: {
   // Is this the answer to a follow-up question we asked last turn?
   const prior = getIntake(sessionId);
   const answering = prior?.pending ?? null;
+
+  // "haan" just after a dose reminder: log the dose and say thank you.
+  if (!answering) {
+    const med = await logReminderReply(patientId, userTextUr).catch(() => null);
+    if (med) {
+      const replyUr = lang === 'en' ? `Thank you — I have noted that you took ${med}.` : `شکریہ، میں نے نوٹ کر لیا کہ آپ نے ${med} لے لی۔`;
+      const agentTurnId = await storeTurn({ patientId, sessionId, role: 'agent', textUr: replyUr });
+      return {
+        replyUr, severity: 'none', findings: [], patientTurnId, agentTurnId,
+        extraction: { glucose_mg_dl: null, glucose_context: null, symptoms: [], symptoms_improved: [], meals: [],
+          medication: { taken: true, missed: false, name: med }, intent: 'log', is_pregnant: null, notes_en: `Took ${med} after reminder` },
+      };
+    }
+  }
 
   // 2. structured extraction + memory reads, in parallel
   const [extraction, facts, features] = await Promise.all([
@@ -486,7 +501,8 @@ async function generateReply(a: {
   // them. Medicines named in this message but not on their list get general
   // facts only, clearly marked, so the model cannot claim the patient takes them.
   const lang = a.lang;
-  const { checks, known } = medicineChecks(checkInput(medList.map(String), a.facts, a.features, a.symptoms ?? []));
+  const egfr = await latestLab(a.patientId, 'egfr');
+  const { checks, known } = medicineChecks(checkInput(medList.map(String), a.facts, a.features, a.symptoms ?? [], egfr?.value ?? null));
   const theirs = new Set(known.flatMap((k) => k.medicines.map((m) => m.id)));
   const facts = known.flatMap((k) => k.medicines.map((m) => {
     const c = card(k.asNamed, m, lang);

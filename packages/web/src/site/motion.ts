@@ -52,7 +52,8 @@ export function useReveal(root: React.RefObject<HTMLElement | null>): void {
  */
 export function useCountUp(value: string): [React.RefObject<HTMLDivElement | null>, string] {
   const ref = useRef<HTMLDivElement>(null);
-  const m = value.match(/^(\d+(?:\.\d+)?)(\D*)$/);
+  const comma = value.includes(',');
+  const m = value.replace(/,/g, '').match(/^(\d+(?:\.\d+)?)(\D*)$/);
   const [shown, setShown] = useState(m && !reducedMotion() ? `0${m[2]}` : value);
 
   useEffect(() => {
@@ -68,7 +69,8 @@ export function useCountUp(value: string): [React.RefObject<HTMLDivElement | nul
       const tick = (now: number) => {
         const p = Math.min(1, (now - t0) / 1200);
         const eased = 1 - Math.pow(1 - p, 3);
-        setShown(`${(target * eased).toFixed(decimals)}${m[2]}`);
+        const num = target * eased;
+        setShown(`${comma ? Math.round(num).toLocaleString('en-US') : num.toFixed(decimals)}${m[2]}`);
         if (p < 1) raf = requestAnimationFrame(tick);
       };
       raf = requestAnimationFrame(tick);

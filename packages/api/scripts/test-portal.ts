@@ -7,6 +7,8 @@
 
 import { progress, gmi, stageOf } from '../src/portal/progress.ts';
 import { normalizePhone, newShareCode, hashPassword, verifyPassword } from '../src/portal/auth.ts';
+import { slotsFor, dueSlot } from '../src/meds/reminders.ts';
+import { interpret, readingAsText } from '../src/vision/glucometer.ts';
 
 let passed = 0;
 let failed = 0;
@@ -59,6 +61,29 @@ ok('stage: 9.2% is very high', stageOf(9.2) === 'very_high');
   const p = progress([{ mg_dl: 60, taken_at: new Date(now - 2 * DAY) }, { mg_dl: 300, taken_at: new Date(now - 3 * DAY) }], now);
   ok('lows and very-highs are counted per month', p.months[0]!.lows === 1 && p.months[0]!.veryHigh === 1);
 }
+
+console.log('\n  Dose reminder times\n');
+const slots = (s: string) => slotsFor(s).join('+');
+ok('"twice daily after meals" -> morning + night', slots('twice daily after meals') === 'morning+night', slots('twice daily after meals'));
+ok('"with breakfast" -> morning', slots('with breakfast') === 'morning');
+ok('Roman Urdu "subah nashte ke baad aur raat ko" -> morning + night', slots('subah nashte ke baad aur raat ko') === 'morning+night', slots('subah nashte ke baad aur raat ko'));
+ok('Urdu "رات کو سونے سے پہلے" -> night', slots('رات کو سونے سے پہلے') === 'night');
+ok('"three times a day" -> morning, afternoon, night', slots('three times a day') === 'morning+afternoon+night');
+ok('unclear schedule -> one morning reminder, never a guessed extra dose', slots('as directed') === 'morning' && slots('') === 'morning');
+ok('08:10 Pakistan time is the morning slot', dueSlot(new Date('2026-10-24T03:10:00Z'))?.slot === 'morning');
+ok('21:40 Pakistan time is the night slot', dueSlot(new Date('2026-10-24T16:40:00Z'))?.slot === 'night');
+ok('11:00 Pakistan time is no slot', dueSlot(new Date('2026-10-24T06:00:00Z')) === null);
+
+console.log('\n  Glucometer photo reading\n');
+ok('"245 mg/dL" -> 245', interpret({ is_glucometer: true, display: '245', value: 245, unit: 'mg/dL', confidence: 0.95 }).mgDl === 245);
+ok('"8.4 mmol/L" -> 151 mg/dL', interpret({ is_glucometer: true, display: '8.4', value: 8.4, unit: 'mmol/L', confidence: 0.9 }).mgDl === 151);
+ok('a decimal under 35 with no unit is read as mmol/L', interpret({ is_glucometer: true, value: 6.1, unit: null, confidence: 0.9 }).mgDl === 110);
+ok('"HI" -> 600 and flagged (an emergency, not a misread)', (() => { const r = interpret({ is_glucometer: true, display: 'HI', value: null, hi_lo: 'HI', confidence: 0.9 }); return r.mgDl === 600 && r.flag === 'hi'; })());
+ok('"LO" -> 20 and flagged', interpret({ is_glucometer: true, display: 'LO', value: null, hi_lo: 'LO', confidence: 0.9 }).flag === 'lo');
+ok('a number no meter can show (2450) is rejected', interpret({ is_glucometer: true, value: 2450, unit: 'mg/dL', confidence: 0.9 }).mgDl === null);
+ok('not a glucometer -> no reading', interpret({ is_glucometer: false, value: 120, confidence: 0.9 }).mgDl === null);
+ok('garbage from the model -> no reading', interpret(null).mgDl === null && interpret({ value: 'abc' }).mgDl === null);
+ok('HI is sent on as "above 600" so triage escalates', readingAsText(interpret({ hi_lo: 'HI', confidence: 1 }), 'en').includes('above 600'));
 
 console.log('\n  Accounts\n');
 ok('0300-1234567 -> 923001234567', normalizePhone('0300-1234567') === '923001234567');

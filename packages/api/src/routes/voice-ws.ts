@@ -13,6 +13,7 @@
  */
 
 import type { FastifyInstance } from 'fastify';
+import { patientAccess } from '../portal/auth.ts';
 import type { WebSocket } from 'ws';
 import { CascadeAdapter } from '../voice/cascade.ts';
 import type { VoiceSession } from '../voice/types.ts';
@@ -20,7 +21,7 @@ import { respond, ensureSession, greeting } from '../orchestrator/turn.ts';
 import { speakUrduStream } from '../voice/azure-tts.ts';
 
 export async function voiceRoutes(app: FastifyInstance): Promise<void> {
-  app.get('/ws/voice', { websocket: true }, (socket: WebSocket) => {
+  app.get('/ws/voice', { websocket: true }, (socket: WebSocket, req) => {
     let patientId: string | null = null;
     let sessionId: string | null = null;
     let session: VoiceSession | null = null;
@@ -79,7 +80,11 @@ export async function voiceRoutes(app: FastifyInstance): Promise<void> {
         switch (msg.type) {
           case 'start':
             if (msg.lang) lang = msg.lang;
-            if (msg.patientId) await start(msg.patientId);
+            if (msg.patientId) {
+              // Same rule as the HTTP API: an account's record needs that account or its care team.
+              if (!(await patientAccess(req, msg.patientId))) { send({ type: 'error', message: 'not allowed' }); break; }
+              await start(msg.patientId);
+            }
             break;
           case 'commit':
             send({ type: 'state', state: 'thinking' });

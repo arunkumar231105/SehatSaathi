@@ -10,6 +10,7 @@ import Medicines from './screens/Medicines.tsx';
 import MyCare from './screens/MyCare.tsx';
 import Login from './site/Login.tsx';
 import Portal from './portal/Portal.tsx';
+import Summary from './portal/Summary.tsx';
 import { LiveLayer } from './portal/live.tsx';
 import { useMe } from './auth.ts';
 import Care from './screens/Care.tsx';
@@ -58,6 +59,7 @@ export default function App() {
   if (path === '/') body = <Landing />;
   else if (path === '/login') body = <Login />;
   else if (path === '/portal') body = <Portal />;
+  else if (path === '/portal/summary') body = <Summary />;
   else if (path === '/care') body = <Care />;
   else if (path === '/preflight') body = <Preflight />;
   else if (inApp) {

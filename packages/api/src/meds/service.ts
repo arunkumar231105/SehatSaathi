@@ -46,7 +46,7 @@ export async function medicineList(patientId: string, facts: ProfileFact[]): Pro
   return rows.map((r) => [r.name, r.dose, r.schedule].filter(Boolean).join(' '));
 }
 
-export function checkInput(meds: string[], facts: ProfileFact[], f: Features, symptoms: SymptomCode[] = []): MedCheckInput {
+export function checkInput(meds: string[], facts: ProfileFact[], f: Features, symptoms: SymptomCode[] = [], egfr: number | null = null): MedCheckInput {
   return {
     medications: meds,
     readings: f.readings.map((r) => ({ mg_dl: r.mg_dl, taken_at: r.taken_at })),
@@ -57,7 +57,16 @@ export function checkInput(meds: string[], facts: ProfileFact[], f: Features, sy
     pregnant: val(facts, 'pregnant') === true,
     conditions: asList(val(facts, 'comorbidities')),
     symptoms,
+    egfr,
   };
+}
+
+export async function latestLab(patientId: string, kind: string): Promise<{ value: number; taken_on: string } | null> {
+  const r = await q<{ value: string; taken_on: string }>(
+    `SELECT value, taken_on FROM lab_results WHERE patient_id=$1 AND kind=$2 ORDER BY taken_on DESC, created_at DESC LIMIT 1`,
+    [patientId, kind],
+  ).catch(() => []);
+  return r[0] ? { value: Number(r[0].value), taken_on: r[0].taken_on } : null;
 }
 
 export function card(asNamed: string, m: Medicine, lang: Lang): MedicineCard {
@@ -71,7 +80,8 @@ export function card(asNamed: string, m: Medicine, lang: Lang): MedicineCard {
 export async function medicinePicture(patientId: string, lang: Lang, symptoms: SymptomCode[] = []): Promise<MedicinePicture> {
   const [facts, features] = await Promise.all([getProfile(patientId), longitudinal(patientId)]);
   const meds = await medicineList(patientId, facts);
-  const input = checkInput(meds, facts, features, symptoms);
+  const egfr = await latestLab(patientId, 'egfr');
+  const input = checkInput(meds, facts, features, symptoms, egfr?.value ?? null);
   const { checks, known, unknown } = medicineChecks(input);
   return {
     cards: known.flatMap((k) => k.medicines.map((m) => card(k.asNamed, m, lang))),

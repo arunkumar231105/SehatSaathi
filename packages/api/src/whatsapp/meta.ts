@@ -16,6 +16,7 @@
  */
 
 import { q, one } from '../db/client.ts';
+import { readGlucometer, readingAsText } from '../vision/glucometer.ts';
 import { medicinePicture, questionsToText } from '../meds/service.ts';
 import { transcribeFile } from '../voice/groq-asr.ts';
 import { speakUrduOgg } from '../voice/azure-tts.ts';
@@ -113,6 +114,7 @@ interface WaMessage {
   type: string;
   text?: { body: string };
   audio?: { id: string; mime_type: string };
+  image?: { id: string; mime_type: string };
 }
 
 interface WaPayload {
@@ -138,6 +140,7 @@ async function handleMessage(m: WaMessage, profileName?: string): Promise<void> 
 
   try {
     let textUr: string | null = null;
+    let photoNote: string | null = null;
 
     if (m.type === 'text' && m.text?.body) {
       textUr = m.text.body.trim();
@@ -145,6 +148,17 @@ async function handleMessage(m: WaMessage, profileName?: string): Promise<void> 
       const { data, mime } = await downloadMedia(m.audio.id);
       const ext = mime.includes('ogg') ? 'ogg' : mime.includes('mp4') ? 'm4a' : 'bin';
       textUr = (await transcribeFile(data, `note.${ext}`, mime)).text;
+    } else if (m.type === 'image' && m.image?.id) {
+      // A photo of the glucometer: read the number, then handle it like a
+      // typed reading — with the number read back so a misread can be corrected.
+      const { data, mime } = await downloadMedia(m.image.id);
+      const r = await readGlucometer(`data:${mime || 'image/jpeg'};base64,${data.toString('base64')}`).catch(() => null);
+      if (!r || r.mgDl === null || r.confidence < 0.6) {
+        await sendText(m.from, 'معاف کیجیے، میں تصویر سے نمبر صاف نہیں پڑھ سکی۔ براہِ کرم میٹر کا نمبر لکھ کر بھیج دیں۔\nSorry, I could not read the meter clearly. Please type the number.');
+        return;
+      }
+      textUr = readingAsText(r, 'ur');
+      photoNote = `📷 میٹر سے میں نے پڑھا: ${r.display ?? r.mgDl}۔ اگر یہ غلط ہے تو صحیح نمبر لکھ دیں۔`;
     } else {
       await sendText(m.from, phrase('welcome').ur);
       return;
@@ -188,6 +202,7 @@ async function handleMessage(m: WaMessage, profileName?: string): Promise<void> 
     const r = await respond({ patientId, sessionId, userTextUr: textUr, channel: 'whatsapp' });
 
     // Text first (instant), then the voice note (a second or two later).
+    if (photoNote) await sendText(m.from, photoNote);
     await sendText(m.from, r.replyUr);
     await sendVoice(m.from, r.replyUr);
 

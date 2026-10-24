@@ -3,6 +3,7 @@ import { api, useMe, homeFor } from '../auth.ts';
 import { navigate } from '../router.tsx';
 import { Icon, Skeleton } from '../ui/Icon.tsx';
 import { ProgressPanel, OrdersList, TeamList, StageBadge, TrendTag, when, type Progress, type Order, type TeamMember, type Stage, type Trend } from './parts.tsx';
+import { LabsPanel, recentA1c, type Lab } from './labs.tsx';
 
 interface Card {
   id: string; name: string; relation: string | null; label: string | null;
@@ -16,7 +17,9 @@ interface Detail {
   alerts: Alert[]; orders: Order[]; team: TeamMember[];
   medicines: { cards: { asNamed: string; generic: string; causesLows: boolean }[]; unknown: string[]; checks: { id: string; urgency: 'today' | 'review'; clinicianEn: string }[] };
   concerns: { id: string; summary_en: string | null; summary_ur: string }[];
+  labs: Lab[];
   canAssign: boolean;
+  canAddLabs: boolean;
 }
 
 const zone = (v: number) => (v < 70 ? 'low' : v <= 180 ? 'ok' : v <= 250 ? 'high' : 'vhigh');
@@ -140,6 +143,7 @@ function PatientView({ d, doctor, reload }: { d: Detail; doctor: boolean; reload
           <div className="pview__chips"><StageBadge stage={d.progress.stage} /><TrendTag trend={d.progress.trend} /><span className="muted small">{d.progress.totalReadings} readings in 90 days</span></div>
         </div>
         <div className="row-btns">
+          <button className="btn btn--sm btn--outline" onClick={() => navigate(`/portal/summary?p=${d.patient.id}`)}><Icon name="print" size={16} /> Visit summary</button>
           {phone && <a className="btn btn--sm btn--outline" href={`tel:+${phone}`}><Icon name="phone" size={16} /> Call</a>}
           {phone && <a className="btn btn--sm btn--wa" href={`https://wa.me/${phone}`} target="_blank" rel="noreferrer"><Icon name="message" size={16} /> WhatsApp</a>}
         </div>
@@ -159,7 +163,12 @@ function PatientView({ d, doctor, reload }: { d: Detail; doctor: boolean; reload
 
       <div className="panel">
         <h3 className="panel__h"><Icon name="chart" size={18} /> Last 3 months</h3>
-        <ProgressPanel p={d.progress} />
+        <ProgressPanel p={d.progress} labA1c={recentA1c(d.labs)} />
+      </div>
+
+      <div className="panel">
+        <h3 className="panel__h"><Icon name="flask" size={18} /> Lab results</h3>
+        <LabsPanel labs={d.labs} canAdd={d.canAddLabs} patientId={d.patient.id} onAdded={reload} />
       </div>
 
       <div className="pview__cols">

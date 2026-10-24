@@ -25,7 +25,7 @@ export default function Landing() {
             <span className="pill-badge"><span className="pill-badge__dot" /> Voice-first diabetes companion · Pakistan</span>
             <h1>Diabetes care that <span className="hl">speaks Urdu</span> — and remembers you.</h1>
             <p className="lead">
-              SehatSaathi is a WhatsApp voice companion for the 33 million people living with diabetes in Pakistan.
+              SehatSaathi is a WhatsApp voice companion for the 34.5 million adults living with diabetes in Pakistan.
               Send a voice note in Urdu. Get clear, spoken guidance in your own language — from a companion that
               knows your history, notices your patterns, and checks on you without being asked.
             </p>
@@ -47,14 +47,28 @@ export default function Landing() {
       </section>
 
       {/* ── Stats ────────────────────────────────────────────────────── */}
-      <section className="stats">
-        <div className="wrap stats__grid">
-          <Stat n="31.4%" l="of Pakistani adults live with diabetes" />
-          <Stat n="33M" l="people — the highest prevalence in the world" />
-          <Stat n="1 in 3" l="adults affected; most get no support between doctor visits" />
-          <Stat n="Urdu" l="voice-first, because a health app you cannot read is no help at all" />
+      <section className="stats" id="numbers">
+        <div className="wrap">
+          <span className="eyebrow eyebrow--light">The scale of it · Pakistan, 2024</span>
+          <div className="stats__grid">
+            <Stat n="34.5M" l="adults living with diabetes — the 4th largest number of any country" src={IDF_SRC} />
+            <Stat n="31.4%" l="of adults aged 20–79 — the highest diabetes prevalence in the world" src={IDF_SRC} />
+            <Stat n="9.3M" l="have diabetes and do not know it (26.9% undiagnosed)" src={IDF_SRC} />
+            <Stat n="226,752" l="deaths attributable to diabetes in a single year — about 620 every day" src={IDF_SRC} />
+          </div>
+          <div className="stats__row">
+            <Fact n="70.2M" l="adults with diabetes by 2050 if nothing changes" src={IDF_SRC} />
+            <Fact n="14.4%" l="more have pre-diabetes (national survey, 10,834 people tested)" src={NDSP_SRC} />
+            <Fact n="39%" l="of Pakistanis aged 10+ cannot read (literacy 60.65%)" src={PBS_SRC} />
+            <Fact n="197M" l="mobile subscriptions — a phone is already in almost every home" src={PTA_SRC} />
+          </div>
+          <p className="stats__src">
+            Sources: <a href="https://diabetesatlas.org/data-by-location/country/pakistan/" target="_blank" rel="noreferrer">IDF Diabetes Atlas, 11th edition — Pakistan (2024)</a> · 
+            <a href="https://bmjopen.bmj.com/content/8/8/e020961" target="_blank" rel="noreferrer">Basit et al., 2nd National Diabetes Survey of Pakistan, BMJ Open 2018</a> · 
+            <a href="https://www.pbs.gov.pk/sites/default/files/population/2023/tables/table_13b_national.pdf" target="_blank" rel="noreferrer">Pakistan Bureau of Statistics, Census 2023</a> · 
+            <a href="https://www.app.com.pk/?p=1088864" target="_blank" rel="noreferrer">PTA via APP, August 2025</a>
+          </p>
         </div>
-        <p className="wrap fine center">Source: IDF Diabetes Atlas, 11th edition (2024)</p>
       </section>
 
       {/* ── Problem ──────────────────────────────────────────────────── */}
@@ -337,10 +351,24 @@ export default function Landing() {
 
 /* ── pieces ──────────────────────────────────────────────────────────── */
 
-function Stat({ n, l }: { n: string; l: string }) {
+const IDF_SRC = { t: 'IDF Diabetes Atlas 2024', u: 'https://diabetesatlas.org/data-by-location/country/pakistan/' };
+const NDSP_SRC = { t: 'NDSP, BMJ Open 2018', u: 'https://bmjopen.bmj.com/content/8/8/e020961' };
+const PBS_SRC = { t: 'PBS Census 2023', u: 'https://www.pbs.gov.pk/sites/default/files/population/2023/tables/table_13b_national.pdf' };
+const PTA_SRC = { t: 'PTA, Aug 2025', u: 'https://www.app.com.pk/?p=1088864' };
+
+function Stat({ n, l, src }: { n: string; l: string; src: { t: string; u: string } }) {
   const [ref, shown] = useCountUp(n);
   // The real value stays readable to screen readers while the digits animate.
-  return <div className="stat" ref={ref}><div className="stat__n" aria-label={n}><span aria-hidden>{shown}</span></div><div className="stat__l">{l}</div></div>;
+  return (
+    <div className="stat" ref={ref}>
+      <div className="stat__n" aria-label={n}><span aria-hidden>{shown}</span></div>
+      <div className="stat__l">{l}</div>
+      <a className="stat__src" href={src.u} target="_blank" rel="noreferrer">{src.t}</a>
+    </div>
+  );
+}
+function Fact({ n, l, src }: { n: string; l: string; src: { t: string; u: string } }) {
+  return <div className="fact2"><b>{n}</b><span>{l} <a href={src.u} target="_blank" rel="noreferrer">{src.t}</a></span></div>;
 }
 
 /** Play button + the words, so the clip is understandable without sound too. */

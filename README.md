@@ -14,7 +14,9 @@
 
 ## The problem
 
-Pakistan has the **highest diabetes prevalence in the world**: 31.4% of adults, roughly **33 million people** ([IDF Diabetes Atlas, 11th ed., 2024](https://diabetesatlas.org/)).
+Pakistan has the **highest diabetes prevalence in the world**: 31.4% of adults aged 20–79 — **34.5 million people** in 2024, projected to reach 70.2 million by 2050. **9.3 million** of them do not know they have it, and **226,752 deaths** were attributable to diabetes in 2024 alone ([IDF Diabetes Atlas, 11th ed. — Pakistan](https://diabetesatlas.org/data-by-location/country/pakistan/)). The national survey found a further **14.4%** with pre-diabetes ([Basit et al., BMJ Open 2018](https://bmjopen.bmj.com/content/8/8/e020961)).
+
+At the same time **39%** of Pakistanis aged 10 and over cannot read ([Census 2023, Pakistan Bureau of Statistics](https://www.pbs.gov.pk/sites/default/files/population/2023/tables/table_13b_national.pdf)) — but there are **197 million** mobile subscriptions ([PTA, Aug 2025](https://www.app.com.pk/?p=1088864)).
 
 Most of them are low-literacy, live far from a specialist, and see a doctor a handful of times a year. Between those visits they manage a complex, dangerous condition alone — deciding what to eat, whether a reading is a problem, and when dizziness is an emergency.
 
@@ -142,6 +144,14 @@ The patient, their doctor and their family each sign in to see the same care, fr
 **Access is the patient's choice.** A doctor or relative connects only with the 6-letter code on the patient's *My care* screen; the patient can remove anyone, or make a new code. A patient who already talks to the bot on WhatsApp keeps their whole history when they create an account with the same number.
 
 **Emergencies reach everyone.** *"Sugar 500 hai aur bohat sar dard hai"* → the rules engine fires, the patient is told to go to hospital now and that their doctor and family have been alerted, and a red banner (with sound) appears on every care-team member's screen with the patient's words and a one-tap call. Appointment and test reminders go out the day before.
+
+**Also in the portals:**
+- **Lab results** — HbA1c, eGFR, creatinine and LDL, entered by the doctor or copied by the patient from a report. A recent lab HbA1c replaces the estimate; a low eGFR flags metformin (below 30: contact the doctor today; 30–45: review the dose), following the label.
+- **Medicine reminders** — each medicine's schedule ("twice daily after meals", "subah nashte ke baad", "رات کو") becomes reminder times; the patient is reminded on WhatsApp inside Meta's 24-hour window, otherwise in the app, and replying *"haan"* logs the dose as taken.
+- **Glucometer photo** — photograph the meter and a vision model reads the number (HI and LO included). On the web the patient confirms it first; on WhatsApp it is read back with a correction prompt. Only then is it processed like any reading, triage included.
+- **Visit summary** — a one-page, print-ready summary (3 months, labs, medicines and checks, the doctor's plan, emergencies, questions for the visit) for a clinic that has never seen the app.
+
+**Privacy:** a record that belongs to an account can only be read by that patient or their care team. The live alert dashboard shows a doctor or relative only their own patients. The demo patient stays open for the demo.
 
 Notifications are always delivered in the portals; WhatsApp is attempted too and the outcome is recorded on each one, because Meta only delivers free-form messages to someone who has messaged the bot in the last 24 hours.
 

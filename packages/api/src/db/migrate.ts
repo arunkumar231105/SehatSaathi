@@ -72,6 +72,32 @@ const STEPS: string[] = [
      created_at  timestamptz NOT NULL DEFAULT now()
    )`,
   `CREATE INDEX IF NOT EXISTS notifications_user ON notifications (user_id, created_at DESC)`,
+
+  // ── Lab results — a real HbA1c replaces the estimate; eGFR feeds the medicine checks ──
+  `CREATE TABLE IF NOT EXISTS lab_results (
+     id          uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+     patient_id  uuid NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+     kind        text NOT NULL CHECK (kind IN ('hba1c','egfr','creatinine','ldl')),
+     value       numeric NOT NULL,
+     taken_on    date NOT NULL,
+     note        text,
+     entered_by  uuid REFERENCES users(id) ON DELETE SET NULL,
+     created_at  timestamptz NOT NULL DEFAULT now()
+   )`,
+  `CREATE INDEX IF NOT EXISTS lab_results_patient ON lab_results (patient_id, kind, taken_on DESC)`,
+
+  // ── Dose reminders: one row per medicine, per time slot, per day, so a
+  //    reminder is never sent twice and a "haan" reply can be matched to it. ──
+  `ALTER TABLE patients ADD COLUMN IF NOT EXISTS reminders_on boolean NOT NULL DEFAULT true`,
+  `CREATE TABLE IF NOT EXISTS dose_reminders (
+     medication_id uuid NOT NULL REFERENCES medications(id) ON DELETE CASCADE,
+     patient_id    uuid NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+     slot          text NOT NULL,          -- 'morning' | 'afternoon' | 'evening' | 'night'
+     day           date NOT NULL,
+     channel       text NOT NULL,          -- 'whatsapp' | 'portal' | 'deferred'
+     sent_at       timestamptz NOT NULL DEFAULT now(),
+     PRIMARY KEY (medication_id, slot, day)
+   )`,
 ];
 
 export async function migrate(): Promise<void> {

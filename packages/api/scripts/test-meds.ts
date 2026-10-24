@@ -58,6 +58,11 @@ ok('pregnant on insulin only -> no flag',
 ok('fasts in Ramzan on gliclazide -> plan ahead',
   checkIds({ medications: ['Diamicron MR'], fastsInRamzan: true }).includes('RAMZAN_PLAN'));
 ok('metformin alone, nothing unusual -> no checks', checkIds({ medications: ['Metformin 500 twice daily'] }).length === 0);
+ok('lab eGFR 25 on metformin -> contact doctor today',
+  medicineChecks(base({ medications: ['Glucophage'], egfr: 25 })).checks.some((c) => c.id === 'METFORMIN_EGFR_BELOW_30' && c.urgency === 'today'));
+ok('lab eGFR 40 on metformin -> dose review at next visit',
+  medicineChecks(base({ medications: ['Glucophage'], egfr: 40 })).checks.some((c) => c.id === 'METFORMIN_EGFR_30_45' && c.urgency === 'review'));
+ok('lab eGFR 75 on metformin -> no kidney flag', !checkIds({ medications: ['Glucophage'], egfr: 75 }).some((id) => id.startsWith('METFORMIN_EGFR')));
 
 console.log('\n  Questions for the doctor\n');
 {

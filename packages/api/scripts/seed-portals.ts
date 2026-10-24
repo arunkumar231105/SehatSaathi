@@ -75,6 +75,33 @@ async function main() {
     }
   }
 
+  // ── The last month, if the demo has gone quiet ───────────────────────
+  // A demo seeded weeks ago has no recent readings, so "improving" cannot be
+  // shown. Add a recent month — only ever additive, never touching history.
+  const recent = await one<{ n: number }>(`SELECT count(*)::int AS n FROM readings WHERE patient_id=$1 AND taken_at > now() - interval '14 days'`, [pid]);
+  if ((recent?.n ?? 0) < 6) {
+    for (let d = 1; d <= 30; d++) {
+      const wobble = ((d * 53) % 31) - 15;
+      const fasting = Math.round(128 + d * 0.6 + wobble * 0.5);
+      const post = Math.round(165 + d * 0.8 + wobble);
+      for (const [mg, ctx, hour] of [[fasting, 'fasting', 7], [post, 'post_meal', 14]] as const) {
+        const t = new Date(Date.now() - d * DAY);
+        t.setHours(hour, 20, 0, 0);
+        await q(`INSERT INTO readings (patient_id, mg_dl, context, taken_at) VALUES ($1,$2,$3,$4)`, [pid, mg, ctx, t]);
+        added++;
+      }
+    }
+  }
+
+  // ── Lab results: a real HbA1c three months ago and now ───────────────
+  const hasLabs = await one(`SELECT 1 FROM lab_results WHERE patient_id=$1`, [pid]);
+  if (!hasLabs) {
+    const on = (days: number) => new Date(Date.now() - days * DAY).toISOString().slice(0, 10);
+    for (const [kind, value, days] of [['hba1c', 8.6, 95], ['hba1c', 7.6, 8], ['egfr', 78, 8], ['ldl', 118, 8]] as const) {
+      await q(`INSERT INTO lab_results (patient_id, kind, value, taken_on, entered_by) VALUES ($1,$2,$3,$4,$5)`, [pid, kind, value, on(days), doctor]);
+    }
+  }
+
   // ── What the doctor has assigned ─────────────────────────────────────
   const hasOrders = await one(`SELECT 1 FROM care_orders WHERE patient_id=$1`, [pid]);
   if (!hasOrders) {

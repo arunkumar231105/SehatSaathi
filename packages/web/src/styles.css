@@ -105,7 +105,7 @@ code { background: var(--bg-tint); padding: .08rem .4rem; border-radius: 6px; fo
 .brand__name { font-family: var(--display); font-weight: 800; font-size: 1.12rem; letter-spacing: -.02em; }
 .brand__ur { color: var(--muted); font-size: .95rem; line-height: 1; margin-top: .15rem; }
 .nav__links { display: flex; gap: .2rem; align-items: center; }
-.nav__links a { color: var(--ink-2); text-decoration: none; font-weight: 500; font-size: .93rem; padding: .45rem .7rem; border-radius: 9px; transition: background .15s, color .15s; }
+.nav__links a { white-space: nowrap; color: var(--ink-2); text-decoration: none; font-weight: 500; font-size: .93rem; padding: .45rem .7rem; border-radius: 9px; transition: background .15s, color .15s; }
 .nav__links a:hover { color: var(--teal); background: var(--teal-softer); }
 .nav__links a.is-on { color: var(--teal-2); background: var(--teal-soft); }
 .nav__links-dash { border: 1px solid var(--line); margin-inline-start: .3rem; }
@@ -176,6 +176,16 @@ code { background: var(--bg-tint); padding: .08rem .4rem; border-radius: 6px; fo
 .stat__n { font-family: var(--display); font-size: clamp(2rem, 4vw, 2.7rem); font-weight: 800; color: var(--mint); line-height: 1.1; letter-spacing: -.02em; }
 .stat__l { color: #c3d2d8; font-size: .94rem; margin-top: .3rem; }
 .stats .fine { color: #8a9ba4; margin-top: 1.6rem; }
+.stat__src { display: inline-block; margin-top: .4rem; font-size: .74rem; color: #8fb3ad; text-decoration: none; border-bottom: 1px dotted rgba(143,224,207,.5); }
+.stat__src:hover { color: var(--mint); }
+.stats__row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-top: 2rem; padding-top: 1.4rem; border-top: 1px solid rgba(255,255,255,.1); }
+.fact2 { display: grid; gap: .2rem; }
+.fact2 b { font-family: var(--display); font-size: 1.35rem; color: #fff; }
+.fact2 span { color: #a9bcc4; font-size: .86rem; }
+.fact2 a { color: #8fb3ad; font-size: .74rem; text-decoration: none; border-bottom: 1px dotted rgba(143,224,207,.5); white-space: nowrap; }
+.stats__src { margin: 1.6rem 0 0; font-size: .78rem; color: #8a9ba4; line-height: 1.7; }
+.stats__src a { color: #a9c9c3; }
+@media (max-width: 760px) { .stats__row { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 760px) { .stats__grid { grid-template-columns: 1fr 1fr; gap: 1.6rem 1rem; } }
 
 /* ── sections ───────────────────────────────────────────────────────── */
@@ -749,6 +759,57 @@ circle.dot { stroke: #fff; stroke-width: 1.5; }
    Urdu falls through to Nastaliq. */
 .order__t, .order__d, .order__k, .team__b, .note, .sharecode .fine { font-family: var(--font), var(--urdu); }
 .app--patient .order__t, .app--patient .order__d { line-height: 1.7; }
+
+/* lab results */
+.labs { display: grid; gap: .7rem; }
+.labs__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: .5rem; }
+.lab { display: grid; background: var(--bg-tint); border-radius: 12px; padding: .6rem .8rem; border-inline-start: 4px solid var(--line-2); font-family: var(--font), var(--urdu); line-height: 1.5; }
+.lab--ok { border-inline-start-color: var(--ok); } .lab--off { border-inline-start-color: var(--high); }
+.lab__k { font-size: .8rem; color: var(--muted); font-weight: 600; }
+.lab__v { font-family: var(--display); font-weight: 800; font-size: 1.35rem; text-align: start; }
+.lab__v small { font-family: var(--font); font-size: .78rem; color: var(--muted); font-weight: 500; }
+.lab__s { font-size: .75rem; color: var(--muted); text-align: start; }
+.lab-hist { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; font-family: var(--font); }
+.lab-hist__p { display: inline-flex; align-items: baseline; gap: .25rem; font-weight: 700; }
+.lab-hist__p small { font-weight: 400; color: var(--muted); font-size: .72rem; }
+.lab-hist__p b { color: var(--muted); font-weight: 400; margin-inline-start: .2rem; }
+.kpi--lab { border-color: #b9dfd5; background: var(--teal-softer); }
+
+/* visit summary — designed for paper first */
+.sum { background: var(--bg-tint); padding: 1.2rem 1rem 3rem; direction: ltr; font-family: var(--font); line-height: 1.5; }
+.sum__bar { max-width: 210mm; margin: 0 auto .8rem; display: flex; justify-content: space-between; }
+.sum__page { max-width: 210mm; margin: 0 auto; background: #fff; padding: 14mm 14mm 10mm; border-radius: 10px; box-shadow: var(--shadow); color: #111; font-size: 10.5pt; }
+.sum__head { display: flex; justify-content: space-between; align-items: flex-end; gap: 1rem; border-bottom: 2px solid var(--teal); padding-bottom: .6rem; margin-bottom: .8rem; }
+.sum__brand { display: flex; align-items: center; gap: .5rem; color: var(--teal-2); font-weight: 700; font-size: 9.5pt; }
+.sum__brand .brand__mark { width: 24px; height: 24px; font-size: .8rem; border-radius: 7px; box-shadow: none; }
+.sum__head h1 { font-size: 20pt; margin: .3rem 0 0; }
+.sum__meta { text-align: right; font-size: 9pt; color: #555; }
+.sum h2 { font-size: 11.5pt; color: var(--teal-2); margin: .9rem 0 .35rem; letter-spacing: 0; }
+.sum h3 { font-size: 10pt; margin: .6rem 0 .2rem; }
+.sum p, .sum ul, .sum ol { margin: 0 0 .4rem; }
+.sum ul, .sum ol { padding-inline-start: 1.2rem; }
+.sum li { margin: .15rem 0; }
+.sum__t { width: 100%; border-collapse: collapse; font-size: 9.5pt; margin: .3rem 0; }
+.sum__t th, .sum__t td { border: 1px solid #ddd; padding: .25rem .45rem; text-align: left; }
+.sum__t th { background: #f3f7f6; font-weight: 600; }
+.sum__t--sm { width: auto; min-width: 60%; }
+.sum__kv { display: flex; flex-wrap: wrap; gap: .3rem 1.4rem; }
+.sum__cols { display: grid; grid-template-columns: 1fr 1fr; gap: 0 1.4rem; }
+.sum__foot { margin-top: 1rem; padding-top: .5rem; border-top: 1px solid #ddd; font-size: 8pt; color: #666; }
+@media (max-width: 700px) { .sum__cols { grid-template-columns: 1fr; } .sum__page { padding: 1rem; } }
+@media print {
+  .nav, .foot, .tabs, .noprint, .sos { display: none !important; }
+  body, .sum { background: #fff !important; }
+  .sum { padding: 0; }
+  .sum__page { box-shadow: none; border-radius: 0; padding: 0; max-width: none; }
+  @page { size: A4; margin: 12mm; }
+}
+
+/* glucometer photo */
+.talk__alt { display: flex; gap: .4rem; flex-wrap: wrap; justify-content: center; }
+.photo-card { align-self: stretch; display: grid; gap: .4rem; background: #fff; border: 1.5px solid var(--teal); border-radius: 14px; padding: .7rem 1rem; box-shadow: var(--shadow-sm); animation: rise .25s both; }
+.photo-card p { margin: 0; font-weight: 600; }
+.photo-card--bad { border-color: var(--warn); background: var(--warn-soft); color: var(--warn-ink); }
 
 /* ── motion ──────────────────────────────────────────────────────────── */
 /* Scroll reveal: the hiding class is only ever added by JS (site/motion.ts). */

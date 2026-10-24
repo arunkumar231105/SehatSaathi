@@ -5,8 +5,9 @@ import { navigate, Link } from '../router.tsx';
 import { t as tr, lang } from '../i18n.ts';
 import { Icon, Skeleton } from '../ui/Icon.tsx';
 import { ProgressPanel, OrdersList, TeamList, type Progress, type Order, type TeamMember } from '../portal/parts.tsx';
+import { LabsPanel, recentA1c, type Lab } from '../portal/labs.tsx';
 
-interface Detail { progress: Progress; orders: Order[]; team: TeamMember[]; shareCode?: string }
+interface Detail { progress: Progress; orders: Order[]; team: TeamMember[]; labs: Lab[]; canAddLabs: boolean; shareCode?: string }
 
 /**
  * The patient's side of the portal: what the doctor has assigned, the
@@ -68,7 +69,12 @@ export default function MyCare({ onPatient }: { onPatient: (id: string) => void 
 
       <div className="card">
         <div className="card__h"><Icon name="chart" size={18} /> {s.careProgress}</div>
-        <ProgressPanel p={d.progress} lang={en ? 'en' : 'ur'} />
+        <ProgressPanel p={d.progress} lang={en ? 'en' : 'ur'} labA1c={recentA1c(d.labs)} />
+      </div>
+
+      <div className="card">
+        <div className="card__h"><Icon name="flask" size={18} /> {s.careLabs}</div>
+        <LabsPanel labs={d.labs} canAdd={d.canAddLabs} patientId={pid!} onAdded={load} lang={en ? 'en' : 'ur'} />
       </div>
 
       <div className="card">
@@ -86,6 +92,7 @@ export default function MyCare({ onPatient }: { onPatient: (id: string) => void 
       </div>
 
       <div className="row-btns">
+        <Link className="btn btn--outline" to={`/portal/summary?p=${pid}`}><Icon name="print" size={18} /> {s.careSummary}</Link>
         <Link className="btn btn--ghost" to="/app/memory"><Icon name="brain" size={18} /> {s.tabMemory}</Link>
         <button className="btn btn--ghost" onClick={async () => { const { logout } = await import('../auth.ts'); await logout(); navigate('/app'); }}>{s.careSignOut}</button>
       </div>
