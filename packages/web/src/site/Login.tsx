@@ -20,7 +20,16 @@ export default function Login() {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => { if (me.user) navigate(homeFor(me.user.role)); }, [me.user]);
+  // /login?demo=doctor&next=/portal opens a demo portal in one click — for a
+  // live presentation, or a link sent to a judge. `next` must be a local path.
+  const params = new URLSearchParams(location.search);
+  const next = params.get('next');
+  const safeNext = next && next.startsWith('/') && !next.startsWith('//') ? next : null;
+  useEffect(() => {
+    const r = params.get('demo') as Role | null;
+    if (r && ['patient', 'doctor', 'family'].includes(r) && !me.user) void demo(r);
+  }, []);
+  useEffect(() => { if (me.user) navigate(safeNext ?? homeFor(me.user.role)); }, [me.user]);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -36,7 +45,7 @@ export default function Login() {
 
   const demo = async (r: Role) => {
     setError(null); setBusy(r);
-    try { const m = await demoLogin(r); if (m.user) navigate(homeFor(m.user.role)); }
+    try { const m = await demoLogin(r); if (m.user) navigate(safeNext ?? homeFor(m.user.role)); }
     catch (err) { setError((err as Error).message); } finally { setBusy(null); }
   };
 
