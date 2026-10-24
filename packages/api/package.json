@@ -8,6 +8,7 @@
     "spike": "tsx scripts/spike-urdu-voice.ts",
     "test:safety": "tsx scripts/test-safety.ts",
     "test:intake": "tsx scripts/test-intake.ts",
+    "test:meds": "tsx scripts/test-meds.ts",
     "seed": "tsx scripts/seed.ts",
     "typecheck": "tsc --noEmit",
     "test:voice": "tsx scripts/test-urdu-voice.ts"

@@ -6,6 +6,7 @@ import Talk from './screens/Talk.tsx';
 import Timeline from './screens/Timeline.tsx';
 import Memory from './screens/Memory.tsx';
 import Plan from './screens/Plan.tsx';
+import Medicines from './screens/Medicines.tsx';
 import Care from './screens/Care.tsx';
 import Preflight from './screens/Preflight.tsx';
 import { getPatientId, get, getLang, setLang } from './api.ts';
@@ -15,6 +16,7 @@ import { Icon, Skeleton, type IconName } from './ui/Icon.tsx';
 const APP_NAV = (s: ReturnType<typeof t>): { p: string; label: string; icon: IconName }[] => [
   { p: '/app', label: s.tabTalk, icon: 'mic' },
   { p: '/app/plan', label: s.tabPlan, icon: 'plan' },
+  { p: '/app/meds', label: s.tabMeds, icon: 'pill' },
   { p: '/app/timeline', label: s.tabRecord, icon: 'chart' },
   { p: '/app/memory', label: s.tabMemory, icon: 'brain' },
 ];
@@ -26,7 +28,9 @@ export default function App() {
   const [, setTick] = useState(0);   // re-render the whole app on a language change
 
   const inApp = path.startsWith('/app');
-  useEffect(() => { if (inApp && !pid) void getPatientId().then(setPid); }, [inApp, pid]);
+  const [pidFailed, setPidFailed] = useState(false);
+  const loadPid = () => { setPidFailed(false); getPatientId().then(setPid).catch(() => setPidFailed(true)); };
+  useEffect(() => { if (inApp && !pid) loadPid(); }, [inApp, pid]);
   useEffect(() => {
     if (!pid) return;
     void get<{ patient: { caregiver_phone: string | null } }>(`/api/patients/${pid}/summary`)
@@ -44,8 +48,16 @@ export default function App() {
   else if (path === '/care') body = <Care />;
   else if (path === '/preflight') body = <Preflight />;
   else if (inApp) {
-    if (!pid) body = <section className="screen"><Skeleton /></section>;
+    if (!pid && pidFailed) {
+      body = (
+        <section className="screen">
+          <div className="err" role="alert">{t().connErr}</div>
+          <div className="row-btns"><button className="btn btn--primary" onClick={loadPid}><Icon name="refresh" size={18} /> {t().tryAgain}</button></div>
+        </section>
+      );
+    } else if (!pid) body = <section className="screen"><Skeleton /></section>;
     else if (path === '/app/plan') body = <Plan patientId={pid} />;
+    else if (path === '/app/meds') body = <Medicines patientId={pid} />;
     else if (path === '/app/timeline') body = <Timeline patientId={pid} />;
     else if (path === '/app/memory') body = <Memory patientId={pid} onPatientChange={setPid} />;
     else body = <Talk patientId={pid} caregiverPhone={caregiverPhone} />;

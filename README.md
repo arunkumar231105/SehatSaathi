@@ -108,6 +108,25 @@ $ npm run test:safety
 
 Including the cases that matter: *one high reading is not a sustained trend*, and *red always dominates a concurrent amber*.
 
+### Medicines: explained and checked, never prescribed
+
+[`meds/reference.ts`](packages/api/src/meds/reference.ts) is a small, hand-written reference for the diabetes medicines used in Pakistan — metformin, gliclazide, glimepiride, glibenclamide, sitagliptin, vildagliptin, empagliflozin, dapagliflozin, pioglitazone, premixed insulin and glargine — in English and Urdu, every entry citing its source (NHS medicine guides, NICE BNF, EMA, the US FDA label). Brands are only those found on Pakistani pharmacy listings (Glucophage, Neodipar, Getryl, Diamicron MR, Treviamet, Galvus Met, Xiga, Mixtard 30…); combination tablets are recognised as both of their medicines; an unrecognised brand is asked about, never guessed.
+
+Public "medicine" datasets were tried first and rejected — one assigned indications at random (*Metformin: "used for pain relief"*), the others contained no medicine information at all.
+
+It does three things, all for medicines the patient **already takes**:
+
+- **Explains** what each one is for, how to take it, common side effects, what to do about a missed dose, and the one warning sign worth knowing — on a *Medicines* screen and in conversation, where the model may explain only from these sourced facts.
+- **Checks** the record with fixed rules ([`meds/checks.ts`](packages/api/src/meds/checks.ts)): the same medicine twice (Glucophage + Treviamet), two from the same family, lows on a medicine that causes them, vomiting on an SGLT2 inhibitor or metformin, pioglitazone with heart failure, kidney disease, pregnancy, fasting in Ramzan. Flags reach the patient, the conversation and the caregiver dashboard.
+- **Prepares the doctor visit**: a short list built from the patient's own record — *"My fasting sugar has risen 5 days in a row on Metformin (Glucophage). Does my treatment need a review?"* — that they can listen to, share on WhatsApp, or get by sending `doctor`.
+
+Every output points toward the doctor; a test fails the build if any patient-facing text tells someone to start, stop, switch or re-dose a medicine.
+
+```console
+$ npm run test:meds
+  32 passed, 0 failed
+```
+
 ---
 
 ## Architecture
@@ -224,6 +243,7 @@ curl -X POST -H "Authorization: Bearer $TOKEN" \
 curl -s https://<domain>/api/health        # db · Model Studio · asr · tts · whatsapp
 docker compose exec api npm run test:safety            # 19 rule tests
 docker compose exec api npm run test:intake            # 19 follow-up question tests
+docker compose exec api npm run test:meds              # 32 medicine reference and check tests
 docker compose exec api npm run test:voice -- --loop   # Urdu TTS → Whisper round trip
 ```
 

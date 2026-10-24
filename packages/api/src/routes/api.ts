@@ -5,6 +5,7 @@ import { getProfile, longitudinal, openConcerns, resolveConcern } from '../memor
 import { speakUrdu, URDU_VOICES } from '../voice/azure-tts.ts';
 import { bus, type AlertEvent } from '../bus.ts';
 import { whatsappConfigured, handleWebhook } from '../whatsapp/meta.ts';
+import { medicinePicture } from '../meds/service.ts';
 
 export async function apiRoutes(app: FastifyInstance): Promise<void> {
   // ── patients ───────────────────────────────────────────────────────────
@@ -42,7 +43,9 @@ export async function apiRoutes(app: FastifyInstance): Promise<void> {
       openConcerns(req.params.id),
       q(`SELECT id, severity, rule_id, reason_ur, reason_en, acknowledged_at, created_at FROM alerts WHERE patient_id=$1 ORDER BY created_at DESC LIMIT 10`, [req.params.id]),
     ]);
-    return { patient: p, facts, features, concerns, alerts };
+    // English-first: the dashboard is read by caregivers and clinicians.
+    const meds = await medicinePicture(req.params.id, 'en');
+    return { patient: p, facts, features, concerns, alerts, medicines: { cards: meds.cards, unknown: meds.unknown, checks: meds.checks } };
   });
 
   app.get<{ Params: { id: string } }>('/api/patients/:id/timeline', async (req) => {
@@ -80,6 +83,12 @@ export async function apiRoutes(app: FastifyInstance): Promise<void> {
   app.get<{ Params: { id: string }; Querystring: { lang?: 'ur' | 'en' } }>(
     '/api/patients/:id/plan',
     async (req) => actionPlan(req.params.id, req.query.lang ?? 'ur'),
+  );
+
+  /** The patient's own medicines explained, rule-based checks, and questions for the doctor. */
+  app.get<{ Params: { id: string }; Querystring: { lang?: 'ur' | 'en' } }>(
+    '/api/patients/:id/medicines',
+    async (req) => medicinePicture(req.params.id, req.query.lang ?? 'ur'),
   );
 
   /** Memory-driven opening line for today. */

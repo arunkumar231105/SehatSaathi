@@ -29,6 +29,9 @@ import {
   applyYesNo, nextSlot, summarise, questionFor, type Intake, type Slot,
 } from './intake.ts';
 import { bus } from '../bus.ts';
+import { identify } from '../meds/reference.ts';
+import { medicineChecks } from '../meds/checks.ts';
+import { checkInput, card } from '../meds/service.ts';
 
 export type Channel = 'web' | 'whatsapp' | 'api';
 export type Lang = 'ur' | 'en';
@@ -237,6 +240,7 @@ export async function respond(args: {
       replyUr = await generateReply({
         userTextUr, extraction, facts, features, patientId, name, amber, lang,
         intakeNotes: intake && intake.asked.length ? summarise(intake) : undefined,
+        symptoms: intake?.symptoms ?? extraction.symptoms,
       });
       clearIntake(sessionId);
     }
@@ -320,7 +324,9 @@ NEVER INVENT ANYTHING ABOUT THIS PATIENT.
 MEDICINES — you educate, you never prescribe.
 - You MAY explain in detail: what a medicine they already take does, when to take it, why with food, common side effects, what to do about one missed dose, how to store insulin, and which of their medicines can cause a low.
 - You MUST NOT: name a medicine they should start, suggest changing or stopping any dose, or say one medicine is better than another. That decision needs blood tests and belongs to their doctor.
-- When asked "which tablet should I take" or "should I increase the dose", say warmly that this is the doctor's decision, explain WHY it needs their tests, and offer to help them prepare the question for the doctor. Never leave them with nothing — always give something useful they can do today.
+- When asked "which tablet should I take" or "should I increase the dose", say warmly that this is the doctor's decision, explain WHY it needs their tests, and offer to help them prepare the question for the doctor (they can open the Medicines screen, or send "doctor" on WhatsApp, for a ready list). Never leave them with nothing — always give something useful they can do today.
+- When you explain one of their medicines, use ONLY the MEDICINE FACTS below — they come from the NHS and official drug leaflets. If a fact is not there, say you are not sure and suggest asking the pharmacist.
+- MEDICINE SAFETY CHECKS below come from fixed rules. If one is marked "today", tell them calmly in your reply. Never turn a check into an instruction to stop, skip or change a medicine.
 
 NUMBERS — never state a threshold the patient did not cross. If they said 220, do not say "since your sugar is above 250". Quote only the number they actually gave, and the numbers from their record below. Getting this wrong makes the advice confusing and untrustworthy.
 
@@ -415,6 +421,8 @@ async function generateReply(a: {
   lang: Lang;
   /** What the follow-up questions established, when this reply closes an intake. */
   intakeNotes?: string[];
+  /** Symptoms known in this exchange, for the medicine sick-day checks. */
+  symptoms?: SymptomCode[];
 }): Promise<string> {
   // Questions — and the recommendation that closes an intake — deserve more
   // reference material and more room to answer.
@@ -448,6 +456,28 @@ async function generateReply(a: {
       ? `MEDICINES THIS PATIENT TAKES (complete list — they take NOTHING else):\n- ${medList.join('\n- ')}\nIf asked about any medicine not on this list (insulin, or any other), do NOT say "the one you take". Either answer generally about people who use it, or ask whether they use it.`
       : 'MEDICINES: none recorded. Do not refer to any medicine as one they take; ask what they have been prescribed.',
   );
+
+  // Sourced facts about the medicines they take, and the rule-based checks on
+  // them. Medicines named in this message but not on their list get general
+  // facts only, clearly marked, so the model cannot claim the patient takes them.
+  const lang = a.lang;
+  const { checks, known } = medicineChecks(checkInput(medList.map(String), a.facts, a.features, a.symptoms ?? []));
+  const theirs = new Set(known.flatMap((k) => k.medicines.map((m) => m.id)));
+  const facts = known.flatMap((k) => k.medicines.map((m) => {
+    const c = card(k.asNamed, m, lang);
+    return `${m.generic} (their "${k.asNamed}"): for — ${c.purpose} | how — ${c.take} | side effects — ${c.sideEffects} | missed dose — ${c.missedDose} | warning — ${c.warning}`;
+  }));
+  for (const m of identify(a.userTextUr).filter((m) => !theirs.has(m.id))) {
+    const c = card(m.generic, m, lang);
+    facts.push(`${m.generic} — NOT on their list, general information only: for — ${c.purpose} | how — ${c.take} | side effects — ${c.sideEffects}`);
+  }
+  if (facts.length) ctx.push('MEDICINE FACTS (sourced — explain only from these):\n- ' + facts.join('\n- '));
+  if (checks.length) {
+    ctx.push(
+      'MEDICINE SAFETY CHECKS (fixed rules):\n- ' +
+        checks.map((c) => `[${c.urgency}] ${lang === 'en' ? c.patientEn : c.patientUr}`).join('\n- '),
+    );
+  }
 
   const other = describeProfile(a.facts.filter((f) => !['name', 'caregiver', 'medications'].includes(f.key)));
   ctx.push(

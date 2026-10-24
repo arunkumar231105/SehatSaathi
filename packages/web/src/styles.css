@@ -334,12 +334,13 @@ code { background: var(--bg-tint); padding: .08rem .4rem; border-radius: 6px; fo
 .app--patient h2 { font-family: var(--urdu); font-size: 1.45rem; font-weight: 700; line-height: 1.9; margin-bottom: .2rem; }
 
 .tabs { position: fixed; bottom: 0; left: 0; right: 0; z-index: 20; padding: 0 .75rem calc(.6rem + env(safe-area-inset-bottom)); pointer-events: none; }
-.tabs__in { pointer-events: auto; max-width: 30rem; margin: 0 auto; display: grid; grid-template-columns: repeat(4, 1fr); gap: .2rem; background: rgba(255,255,255,.92); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border: 1px solid var(--line); border-radius: 22px; padding: .35rem; box-shadow: 0 12px 32px -8px rgba(12,37,48,.22); }
+.tabs__in { pointer-events: auto; max-width: 32rem; margin: 0 auto; display: grid; grid-template-columns: repeat(5, 1fr); gap: .2rem; background: rgba(255,255,255,.92); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border: 1px solid var(--line); border-radius: 22px; padding: .35rem; box-shadow: 0 12px 32px -8px rgba(12,37,48,.22); }
 .tabs__a { display: flex; flex-direction: column; align-items: center; gap: .05rem; padding: .45rem 0 .2rem; border-radius: 16px; color: var(--muted); text-decoration: none; font-family: var(--urdu); transition: background .15s, color .15s; }
 .tabs__a:hover { color: var(--ink); }
 .tabs__a--on { color: var(--teal-2); background: var(--teal-soft); }
 .tabs__i { line-height: 1; height: 22px; }
-.tabs__t { font-size: .84rem; line-height: 1.7; font-weight: 600; }
+.tabs__t { font-size: .8rem; line-height: 1.7; font-weight: 600; white-space: nowrap; }
+@media (max-width: 380px) { .tabs { padding-inline: .4rem; } .tabs__t { font-size: .72rem; } }
 
 .talk { flex: 1; display: flex; flex-direction: column; min-height: 0; padding-bottom: 5.6rem; }
 .app--patient:has(.talk) .main { overflow: hidden; }
@@ -466,6 +467,38 @@ circle.dot { stroke: #fff; stroke-width: 1.5; }
 .act__do { font-size: 1.08rem; line-height: 1.95; font-weight: 600; }
 .act__why { font-size: .87rem; color: var(--muted); line-height: 1.8; margin-top: .15rem; }
 
+/* medicines */
+.medcheck { margin: .2rem 0 0; }
+.meds { display: grid; gap: .6rem; margin: .8rem 0; }
+.med { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow-sm); overflow: hidden; }
+.med summary, .med--unknown { display: flex; align-items: center; gap: .8rem; padding: .8rem 1rem; cursor: pointer; list-style: none; }
+.med summary::-webkit-details-marker { display: none; }
+.med summary::after { content: '+'; margin-inline-start: auto; flex: none; width: 26px; height: 26px; display: grid; place-items: center; border-radius: 50%; background: var(--teal-soft); color: var(--teal); font-weight: 700; font-family: var(--font); transition: transform .2s; }
+.med[open] summary::after { transform: rotate(45deg); }
+.med__i { flex: none; width: 42px; height: 42px; border-radius: 12px; background: var(--teal-soft); color: var(--teal); display: grid; place-items: center; }
+.med__name { display: grid; min-width: 0; }
+.med__name b { font-family: var(--font); font-size: 1.02rem; line-height: 1.4; overflow-wrap: anywhere; }
+.med__name small { display: flex; align-items: center; flex-wrap: wrap; gap: .4rem; font-family: var(--font); color: var(--muted); font-size: .82rem; line-height: 1.5; }
+.med__as { opacity: .8; }
+.med__part { font-family: var(--font); font-size: .95rem; color: var(--teal-2); margin: .3rem 1rem .4rem; }
+.med--unknown { border-style: dashed; cursor: default; }
+.med--unknown small { font-family: inherit; }
+.med__dl { margin: 0; padding: 0 1rem .4rem; display: grid; gap: .5rem; }
+.med__dl div { background: var(--bg-tint); border-radius: 10px; padding: .45rem .8rem; }
+.med__dl dt { font-size: .82rem; color: var(--teal-2); font-weight: 700; display: flex; align-items: center; gap: .3rem; }
+.med__dl dd { margin: 0; }
+.med__warn { background: var(--warn-soft) !important; }
+.med__warn dt { color: var(--warn-ink); }
+.med__src { margin: 0; padding: .2rem 1rem .8rem; font-family: var(--font); font-size: .78rem; color: var(--muted); line-height: 1.5; }
+.med__src a { margin-inline-end: .6rem; }
+.doctor__list { margin: .4rem 0 0; padding-inline-start: 1.4rem; display: grid; gap: .5rem; }
+.doctor__list li::marker { color: var(--teal); font-weight: 700; }
+.care-meds { display: grid; gap: .4rem; margin-bottom: 1rem; }
+.care-med { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; background: var(--bg-tint); border-radius: 10px; padding: .45rem .7rem; font-size: .92rem; }
+.care-med b { font-weight: 600; }
+.care-med span { color: var(--muted); }
+.sig--today { background: var(--danger-soft); color: #8f1d1d; }
+
 /* ── caregiver dashboard ─────────────────────────────────────────────── */
 .care { direction: ltr; font-family: var(--font); line-height: 1.5; max-width: 76rem; padding: 1.6rem 1.25rem 4rem; }
 .care h2, .care h3 { font-family: var(--display); }
@@ -559,6 +592,7 @@ circle.dot { stroke: #fff; stroke-width: 1.5; }
 .app--patient.app--en .fact__meta { justify-content: flex-start; }
 .app--patient.app--en .bubble--patient { align-self: flex-end; border-radius: 1.2rem 1.2rem .35rem 1.2rem; }
 .app--patient.app--en .bubble--agent { align-self: flex-start; border-radius: 1.2rem 1.2rem 1.2rem .35rem; }
+.app--patient.app--en .med__dl, .app--patient.app--en .doctor__list, .app--patient.app--en .medcheck { font-family: var(--font); line-height: 1.5; }
 .app--patient.app--en .act__do, .app--patient.app--en .act__why, .app--patient.app--en .act__tag, .app--patient.app--en .disclaimer, .app--patient.app--en .kpi__l { font-family: var(--font); line-height: 1.5; }
 .app--patient.app--en .act__why { margin-top: .3rem; }
 

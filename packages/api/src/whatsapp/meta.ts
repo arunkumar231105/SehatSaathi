@@ -16,6 +16,7 @@
  */
 
 import { q, one } from '../db/client.ts';
+import { medicinePicture, questionsToText } from '../meds/service.ts';
 import { transcribeFile } from '../voice/groq-asr.ts';
 import { speakUrduOgg } from '../voice/azure-tts.ts';
 import { respond, ensureSession, greeting, actionPlan } from '../orchestrator/turn.ts';
@@ -159,6 +160,16 @@ async function handleMessage(m: WaMessage, profileName?: string): Promise<void> 
     // it exists, and it is the most useful single message we send.
     if (/^(plan|my plan|منصوبہ|پلان)\b/i.test(textUr.trim())) {
       const { text } = await actionPlan(patientId, 'ur');
+      await sendText(m.from, text);
+      await sendVoice(m.from, text);
+      return;
+    }
+
+    // "doctor" / "ڈاکٹر" returns the list of things to raise at the next
+    // appointment — built from the patient's own record and medicines.
+    if (/^(doctor|daktar|dr|ڈاکٹر)\b/i.test(textUr.trim()) && textUr.trim().length < 20) {
+      const pic = await medicinePicture(patientId, 'ur');
+      const text = questionsToText(pic.questions, 'ur');
       await sendText(m.from, text);
       await sendVoice(m.from, text);
       return;

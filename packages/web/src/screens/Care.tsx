@@ -15,6 +15,11 @@ interface Summary {
   features: { mean7: number | null; timeInRange14: number | null; risingFastingDays: number; dawnPhenomenon: boolean; missedDoses7: number; adherenceStreakDays: number; spikeFoods: string[]; postMealSpikes7: number };
   facts: { key: string; value: unknown }[];
   concerns: { id: string; summary_en: string | null; summary_ur: string }[];
+  medicines?: {
+    cards: { asNamed: string; generic: string; causesLows: boolean }[];
+    unknown: string[];
+    checks: { id: string; urgency: 'today' | 'review'; clinicianEn: string }[];
+  };
 }
 
 // The dashboard is English-first, so its dates are too — whatever language
@@ -137,6 +142,31 @@ export default function Care() {
                     {sum.features.postMealSpikes7 > 0 && <li className="sig sig--warn"><Icon name="food" size={16} /> {sum.features.postMealSpikes7} post-meal spike{sum.features.postMealSpikes7 > 1 ? 's' : ''}{sum.features.spikeFoods.length ? ` — after ${sum.features.spikeFoods.join(', ')}` : ''}</li>}
                     {sum.features.missedDoses7 === 0 && <li className="sig sig--ok"><Icon name="check" size={16} /> Medication streak: {sum.features.adherenceStreakDays} days</li>}
                   </ul>
+                  {sum.medicines && (sum.medicines.cards.length > 0 || sum.medicines.unknown.length > 0) && (
+                    <>
+                      <div className="card__h">Medicines</div>
+                      <div className="care-meds">
+                        {sum.medicines.cards.map((m, i) => (
+                          <div key={i} className="care-med">
+                            <Icon name="pill" size={16} /><b>{m.generic}</b><span>as “{m.asNamed}”</span>
+                            {m.causesLows && <span className="tag tag--symptom">hypo risk</span>}
+                          </div>
+                        ))}
+                        {sum.medicines.unknown.map((u) => (
+                          <div key={u} className="care-med"><Icon name="pill" size={16} /><b>{u}</b><span>not recognised — confirm with patient</span></div>
+                        ))}
+                      </div>
+                      {sum.medicines.checks.length > 0 && (
+                        <ul className="signals">
+                          {sum.medicines.checks.map((c) => (
+                            <li key={c.id} className={`sig ${c.urgency === 'today' ? 'sig--today' : 'sig--warn'}`}>
+                              <Icon name="alert" size={16} /> {c.urgency === 'today' ? 'Today: ' : 'Review: '}{c.clinicianEn}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </>
+                  )}
                   {sum.concerns.length > 0 && (
                     <>
                       <div className="card__h">Open follow-ups</div>
