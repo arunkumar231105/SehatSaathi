@@ -2,6 +2,7 @@
  * One conversational turn, end to end.
  *
  *   utterance ─▶ extract (JSON) ─▶ persist values ─▶ TRIAGE (rules) ─┬─ red ─▶ fixed phrase + alert
+ *                                                                    ├─ still unknown ▶ ask ONE follow-up question
  *                                                                    └─ else ▶ context pack ─▶ Qwen ─▶ reply
  *              ─▶ persist reply ─▶ async: embed · profile extraction · concerns
  *
@@ -23,6 +24,10 @@ import {
 import { extractProfile } from '../memory/extractor.ts';
 import { retrieve } from '../rag/kb.ts';
 import { buildPlan, planToText, type PlanAction } from './plan.ts';
+import {
+  getIntake, saveIntake, clearIntake, shouldStart, start as startIntake, merge as mergeIntake,
+  applyYesNo, nextSlot, summarise, questionFor, type Intake, type Slot,
+} from './intake.ts';
 import { bus } from '../bus.ts';
 
 export type Channel = 'web' | 'whatsapp' | 'api';
@@ -40,6 +45,8 @@ export interface TurnResult {
   alertId?: string;
   patientTurnId: string;
   agentTurnId: string;
+  /** The follow-up question this reply asks, if the companion is still gathering facts. */
+  asking?: Slot;
 }
 
 const SYMPTOM_EN: Partial<Record<SymptomCode, string>> = {
@@ -133,22 +140,42 @@ export async function respond(args: {
   // 1. persist the patient's words first — nothing downstream may lose them
   const patientTurnId = await storeTurn({ patientId, sessionId, role: 'patient', textUr: userTextUr });
 
+  // Is this the answer to a follow-up question we asked last turn?
+  const prior = getIntake(sessionId);
+  const answering = prior?.pending ?? null;
+
   // 2. structured extraction + memory reads, in parallel
   const [extraction, facts, features] = await Promise.all([
-    extractClinical(userTextUr),
+    extractClinical(userTextUr, answering && prior ? questionFor(answering, prior).en : undefined),
     getProfile(patientId),
     longitudinal(patientId),
   ]);
 
   // 3. persist extracted values with provenance
-  await persistExtraction(patientId, patientTurnId, extraction);
+  const readingId = await persistExtraction(patientId, patientTurnId, extraction);
 
-  // 4. deterministic triage — includes what was just logged
+  // 3b. fold this turn into the follow-up intake, or open one
+  let intake: Intake | null = null;
+  if (prior) {
+    intake = applyYesNo(mergeIntake(prior, extraction, readingId), answering, userTextUr);
+    if (answering) intake.answers = [...intake.answers, { slot: answering, text: userTextUr.slice(0, 200) }];
+    intake.pending = null;
+    // "It was fasting" corrects the reading logged a turn ago.
+    if (extraction.glucose_mg_dl === null && extraction.glucose_context && intake.readingId) {
+      await q(`UPDATE readings SET context=$1 WHERE id=$2`, [extraction.glucose_context, intake.readingId]);
+    }
+  } else if (shouldStart(extraction)) {
+    intake = startIntake(extraction, readingId);
+  }
+
+  // 4. deterministic triage — over everything learned in this exchange, not
+  //    just this message. "250" then, two answers later, "I've been vomiting"
+  //    is suspected DKA even though no single message said both.
   const isPregnant = extraction.is_pregnant ?? fact(facts, 'pregnant') === true;
   const result = triage({
-    glucoseMgDl: extraction.glucose_mg_dl ?? undefined,
-    glucoseContext: extraction.glucose_context ?? undefined,
-    symptoms: extraction.symptoms,
+    glucoseMgDl: (intake?.glucose ?? extraction.glucose_mg_dl) ?? undefined,
+    glucoseContext: (intake?.context ?? extraction.glucose_context) ?? undefined,
+    symptoms: intake?.symptoms ?? extraction.symptoms,
     isPregnant,
     recentReadings: features.readings.map((r) => ({ mgDl: r.mg_dl, takenAt: new Date(r.taken_at) })),
     missedDosesLast7Days: features.missedDoses7 + (extraction.medication.missed ? 1 : 0),
@@ -158,6 +185,7 @@ export async function respond(args: {
   let audioOverride: Buffer | undefined;
   let fallbackAudio: Buffer | undefined;
   let alertId: string | undefined;
+  let asking: Slot | undefined;
 
   const caregiverPhone = await one<{ caregiver_phone: string | null; display_name: string | null }>(
     `SELECT caregiver_phone, display_name FROM patients WHERE id=$1`, [patientId],
@@ -179,16 +207,38 @@ export async function respond(args: {
     else fallbackAudio = clip;
 
     alertId = await insertAlert(patientId, patientTurnId, primary);
+    clearIntake(sessionId);   // an emergency ends the questioning
   } else {
-    // ── Normal turn: the model speaks, grounded in memory ──
-    replyUr = await generateReply({
-      userTextUr, extraction, facts, features, patientId,
-      name: ((lang === 'en' ? fact(facts, 'name_en') : undefined) ?? fact(facts, 'name') ?? caregiverPhone?.display_name ?? undefined) as string | undefined,
-      amber: result.findings.filter((f) => f.severity === 'amber'),
-      lang,
-    });
-    for (const f of result.findings) {
-      if (f.severity === 'amber') alertId = await insertAlert(patientId, patientTurnId, f);
+    const name = ((lang === 'en' ? fact(facts, 'name_en') : undefined) ?? fact(facts, 'name') ?? caregiverPhone?.display_name ?? undefined) as string | undefined;
+    const amber = result.findings.filter((f) => f.severity === 'amber');
+    for (const f of amber) {
+      // During an intake the same reading is re-triaged every turn; alert once.
+      if (intake?.alerted.includes(f.ruleId)) continue;
+      alertId = await insertAlert(patientId, patientTurnId, f);
+      intake?.alerted.push(f.ruleId);
+    }
+
+    // A question from the patient mid-intake is answered now, with what we know.
+    const meds = fact(facts, 'medications');
+    const next = intake && extraction.intent !== 'question'
+      ? nextSlot(intake, { hasMedicines: !(Array.isArray(meds) && meds.length === 0) })
+      : null;
+
+    if (intake && next) {
+      // ── Still gathering: ask one short question, give no advice yet ──
+      asking = next;
+      const first = intake.asked.length === 0;
+      intake.asked = [...intake.asked, next];
+      intake.pending = next;
+      saveIntake(sessionId, intake);
+      replyUr = await askFollowUp({ question: questionFor(next, intake), first, userTextUr, extraction, patientId, name, lang });
+    } else {
+      // ── Normal turn, or the intake is complete: the model advises, grounded in memory ──
+      replyUr = await generateReply({
+        userTextUr, extraction, facts, features, patientId, name, amber, lang,
+        intakeNotes: intake && intake.asked.length ? summarise(intake) : undefined,
+      });
+      clearIntake(sessionId);
     }
   }
 
@@ -205,16 +255,19 @@ export async function respond(args: {
   return {
     replyUr, audioOverride, fallbackAudio,
     severity: result.severity, findings: result.findings, extraction,
-    alertId, patientTurnId, agentTurnId,
+    alertId, patientTurnId, agentTurnId, asking,
   };
 }
 
-async function persistExtraction(patientId: string, turnId: string, ex: Extraction): Promise<void> {
+/** Returns the id of the reading logged this turn, if any. */
+async function persistExtraction(patientId: string, turnId: string, ex: Extraction): Promise<string | null> {
+  let readingId: string | null = null;
   if (ex.glucose_mg_dl !== null) {
-    await q(
-      `INSERT INTO readings (patient_id, turn_id, mg_dl, context) VALUES ($1,$2,$3,$4)`,
+    const row = await one<{ id: string }>(
+      `INSERT INTO readings (patient_id, turn_id, mg_dl, context) VALUES ($1,$2,$3,$4) RETURNING id`,
       [patientId, turnId, ex.glucose_mg_dl, ex.glucose_context ?? 'random'],
     );
+    readingId = row?.id ?? null;
   }
   for (const s of ex.symptoms) {
     await q(`INSERT INTO symptoms (patient_id, turn_id, code) VALUES ($1,$2,$3)`, [patientId, turnId, s]);
@@ -244,6 +297,7 @@ async function persistExtraction(patientId: string, turnId: string, ex: Extracti
       [patientId, turnId],
     );
   }
+  return readingId;
 }
 
 async function insertAlert(patientId: string, turnId: string, f: Finding): Promise<string> {
@@ -295,6 +349,61 @@ const PERSONA_EN = PERSONA.replace(
 ).replace('You speak SIMPLE spoken Urdu, like an experienced, kind family nurse — never clinical jargon, never English sentences (drug and brand names in English are fine).',
   'You speak SIMPLE, warm English, like an experienced, kind family nurse — never clinical jargon.');
 
+/**
+ * One follow-up question. The slot is chosen by intake.ts; the model only
+ * makes it sound like a person — acknowledging what was just said — and the
+ * fixed wording is used whenever its output is not a clean single question.
+ */
+async function askFollowUp(a: {
+  question: { ur: string; en: string; brief: string };
+  first: boolean;
+  userTextUr: string;
+  extraction: Extraction;
+  patientId: string;
+  name?: string;
+  lang: Lang;
+}): Promise<string> {
+  const qn = a.question;
+  const rb = a.lang === 'en' ? readbackEn(a.extraction) : readback(a.extraction);
+  const intro = a.first
+    ? (a.lang === 'en' ? 'To advise you properly, I need to ask a couple of things. ' : 'صحیح مشورے کے لیے مجھے ایک دو باتیں پوچھنی ہیں۔ ')
+    : '';
+  const fallback = rb + intro + (a.lang === 'en' ? qn.en : qn.ur);
+
+  const history = await recentTurns(a.patientId, 4).catch(() => []);
+  const system =
+    `You are صحت ساتھی (SehatSaathi), a warm diabetes companion talking to ${a.name ?? 'a patient'} in Pakistan. ` +
+    'You are gathering information BEFORE giving advice. Write at most two short sentences:\n' +
+    '1. Briefly acknowledge what they just said. If they gave a sugar number, repeat that exact number. Do not judge it as good or bad yet.\n' +
+    (a.first ? '   Mention in a few words that you need to ask a couple of things to advise properly.\n' : '') +
+    `2. Ask exactly ONE question, about: ${qn.brief}.\n` +
+    'Do NOT give advice, tips, reassurance or a recommendation yet. Do not ask about anything else. Plain text — no lists, emoji or markdown. ' +
+    (a.lang === 'en'
+      ? 'Write in simple English.'
+      : 'Write in simple spoken Urdu, in Urdu script only — never Roman Urdu.') +
+    `\nExample of the question: "${a.lang === 'en' ? qn.en : qn.ur}"`;
+
+  try {
+    const out = (await chat(
+      [
+        { role: 'system', content: system },
+        ...history.slice(0, -1).map((t) => ({ role: (t.role === 'patient' ? 'user' : 'assistant') as 'user' | 'assistant', content: t.text_ur })),
+        { role: 'user', content: a.userTextUr },
+      ],
+      { model: MODELS.brain, temperature: 0.4, maxTokens: 120 },
+    )).replace(/[*_#`]/g, '').trim();
+
+    // Exactly one question, in the right script, quoting the number they gave —
+    // anything else and the fixed wording is safer.
+    const oneQuestion = (out.match(/[?؟]/g) ?? []).length === 1;
+    const scriptOk = a.lang === 'en' ? /[A-Za-z]/.test(out) : isUrduScript(out);
+    const numberOk = a.extraction.glucose_mg_dl === null || out.includes(String(a.extraction.glucose_mg_dl));
+    return oneQuestion && scriptOk && numberOk && out.length <= 320 ? out : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 async function generateReply(a: {
   userTextUr: string;
   extraction: Extraction;
@@ -304,9 +413,12 @@ async function generateReply(a: {
   name?: string;
   amber: Finding[];
   lang: Lang;
+  /** What the follow-up questions established, when this reply closes an intake. */
+  intakeNotes?: string[];
 }): Promise<string> {
-  // Questions deserve more reference material and more room to answer.
-  const isQuestion = a.extraction.intent === 'question';
+  // Questions — and the recommendation that closes an intake — deserve more
+  // reference material and more room to answer.
+  const isQuestion = a.extraction.intent === 'question' || !!a.intakeNotes;
   const [episodes, history, concerns, refs] = await Promise.all([
     recallEpisodes(a.patientId, a.userTextUr, 4),
     recentTurns(a.patientId, 6),
@@ -369,6 +481,16 @@ async function generateReply(a: {
     );
   }
   if (a.amber.length) ctx.push('Rules engine flagged (include the advice, calmly): ' + a.amber.map((f) => f.reasonUr).join(' '));
+  if (a.intakeNotes) {
+    ctx.push(
+      'WHAT YOU LEARNED BY ASKING — you asked follow-up questions and the patient answered. Now give your FINAL RECOMMENDATION:\n- ' +
+        a.intakeNotes.join('\n- ') +
+        '\nRepeat their number. Explain in one sentence what most likely raised it, using what THEY told you (the food, the timing, a missed dose) — say "likely", never certain. ' +
+        'Then give 2–3 concrete things to do today and when to check sugar again, each tied to their answers. ' +
+        'If they missed their medicine, say to take their next dose as the doctor prescribed — never suggest doubling or changing it. ' +
+        'Do not ask another question. Up to 5 short sentences.',
+    );
+  }
   ctx.push(`Extracted from this turn: ${JSON.stringify({ glucose: a.extraction.glucose_mg_dl, context: a.extraction.glucose_context, symptoms: a.extraction.symptoms, meals: a.extraction.meals.map((m) => m.items).flat(), medication: a.extraction.medication, intent: a.extraction.intent })}`);
 
   // A last-position reminder. Instructions at the end of the prompt are
@@ -381,6 +503,7 @@ async function generateReply(a: {
       ? `They take: ${medList.join('; ')} — nothing else. `
       : 'No medicines are recorded for them. ') +
     'Do not claim they use any other medicine. ' +
+    (a.intakeNotes ? 'Give your final recommendation now, tied to their answers. ' : '') +
     (a.lang === 'en' ? 'Write in English.]' : 'Write in Urdu script.]');
 
   const messages = [

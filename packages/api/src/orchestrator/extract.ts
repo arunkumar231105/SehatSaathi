@@ -62,12 +62,21 @@ Output ONLY a JSON object with exactly these keys:
 Mapping hints: chakkar -> dizziness; pasina -> sweating; kapkapi -> shakiness; ulti -> vomiting; matli -> nausea; pait dard -> abdominal_pain; seenay mein dard -> chest_pain; paon sun -> foot_numbness; suiyan/jhunjhunahat -> tingling; zakham -> non_healing_wound or foot_ulcer; nazar dhundli -> blurred_vision; pyaas -> excessive_thirst; bar bar peshab -> frequent_urination; kamzori/thakan -> fatigue; wazan kam -> weight_loss.
 Never invent a glucose number that was not said. Unknown -> null.`;
 
-export async function extractClinical(userText: string): Promise<Extraction> {
+/**
+ * `answering` is the follow-up question this utterance replies to, if any.
+ * "Khali pait" or "biryani" alone is ambiguous; as the answer to "was it
+ * fasting?" or "what did you eat?" it is not.
+ */
+export async function extractClinical(userText: string, answering?: string): Promise<Extraction> {
   let raw = '';
+  const system = answering
+    ? `${SYSTEM}
+The patient is ANSWERING this question you asked: "${answering}". Read short answers in that light — e.g. "khali pait" -> glucose_context fasting; a list of foods -> meals; "haan, li thi" -> medication.taken true; "nahi" to a symptom question -> no symptoms. Do not repeat an earlier glucose number unless they say a number now.`
+    : SYSTEM;
   try {
     raw = await chat(
       [
-        { role: 'system', content: SYSTEM },
+        { role: 'system', content: system },
         { role: 'user', content: userText },
       ],
       { model: MODELS.memory, temperature: 0, json: true, maxTokens: 400 },

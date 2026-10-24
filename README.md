@@ -59,6 +59,32 @@ Nobody prompted that. Four memory tiers make it possible:
 
 ---
 
+## It asks before it advises
+
+*"My sugar is 250"* on its own only supports generic advice. A nurse would ask first — so does SehatSaathi, one short question per message, never more than three:
+
+```
+Patient:  آج شوگر 250 تھی                       "My sugar was 250 today."
+Saathi:   خالی پیٹ چیک کی تھی یا کھانے کے بعد؟     "Fasting, or after eating?"
+Patient:  کھانے کے بعد                           "After eating."
+Saathi:   الٹی، پیٹ درد، تیز سانس یا بہت پیاس؟      "Any vomiting, stomach pain, fast breathing, strong thirst?"
+Patient:  نہیں                                    "No."
+Saathi:   دوپہر کو کیا کھایا تھا؟                   "What did you eat at lunch?"
+Patient:  بریانی اور دو روٹیاں                     "Biryani and two rotis."
+Saathi:   one recommendation, tied to the biryani, the timing and the number.
+```
+
+[`orchestrator/intake.ts`](packages/api/src/orchestrator/intake.ts) decides **which** question comes next — timing, then the danger check on any reading of 250+, then food, then medicine — from what is still unknown. Nothing already said is asked again, a reading in range gets no interrogation, and a high *fasting* reading asks about last night's dinner rather than breakfast. The model only phrases the question.
+
+This also makes triage see across messages: *"280"*, then two answers later *"I've been vomiting"*, is suspected ketoacidosis even though no single message said both — the rules run over everything learned in the exchange. An emergency never waits for questions.
+
+```console
+$ npm run test:intake
+  19 passed, 0 failed
+```
+
+---
+
 ## Safety: the model never makes the medical call
 
 [`safety/rules.ts`](packages/api/src/safety/rules.ts) is a table of **11 deterministic rules** evaluated over extracted values and clinical history. Whether a situation is an emergency is decided in code, not in a prompt. The language model's job is warmth and Urdu fluency; triage is not its job.
@@ -197,6 +223,7 @@ curl -X POST -H "Authorization: Bearer $TOKEN" \
 ```bash
 curl -s https://<domain>/api/health        # db · Model Studio · asr · tts · whatsapp
 docker compose exec api npm run test:safety            # 19 rule tests
+docker compose exec api npm run test:intake            # 19 follow-up question tests
 docker compose exec api npm run test:voice -- --loop   # Urdu TTS → Whisper round trip
 ```
 
