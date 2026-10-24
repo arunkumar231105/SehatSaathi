@@ -48,17 +48,47 @@ async function ask(model: string, base: string, key: string, image: string): Pro
   return (j.choices?.[0]?.message?.content ?? '').replace(/<think>[\s\S]*?<\/think>/g, '');
 }
 
-/** Groq's vision model first; Model Studio's Qwen-VL if Groq is unavailable. */
+/**
+ * Which vision models exist differs per account and changes over time, so
+ * this is a list tried in order ("provider:model"), not one hard-coded name.
+ * The first that answers is remembered for the life of the process.
+ * Override with MODEL_VISION="dashscope:qwen3-vl-plus,groq:…".
+ */
+// Groq's qwen3.8-27b reads images on this project's key; the Model Studio
+// vision models are listed but need purchasing, so they are the fallbacks.
+const CANDIDATES = (process.env.MODEL_VISION ?? 'groq:qwen/qwen3.8-27b,dashscope:qwen3-vl-plus,dashscope:qwen3.8-omni-flash')
+  .split(',').map((s) => s.trim()).filter(Boolean);
+let working: string | null = null;
+
+function endpoint(c: string): { base: string; key: string | undefined; model: string } {
+  const [provider, ...rest] = c.split(':');
+  const model = rest.join(':');
+  return provider === 'groq'
+    ? { base: process.env.GROQ_BASE_URL ?? 'https://api.groq.com/openai/v1', key: process.env.GROQ_API_KEY, model }
+    : { base: process.env.DASHSCOPE_BASE_URL ?? 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1', key: process.env.DASHSCOPE_API_KEY, model };
+}
+
 async function vision(image: string): Promise<string> {
-  const groqKey = process.env.GROQ_API_KEY;
-  const groqModel = process.env.MODEL_VISION ?? 'meta-llama/llama-4-scout-17b-16e-instruct';
-  if (groqKey) {
-    try { return await ask(groqModel, process.env.GROQ_BASE_URL ?? 'https://api.groq.com/openai/v1', groqKey, image); }
-    catch (err) { console.warn('vision: groq failed, trying model studio', err instanceof Error ? err.message.slice(0, 120) : err); }
+  const order = working ? [working, ...CANDIDATES.filter((c) => c !== working)] : CANDIDATES;
+  let last: unknown = new Error('no vision model configured');
+  for (const c of order) {
+    const { base, key, model } = endpoint(c);
+    if (!key) continue;
+    try {
+      // A free-tier rate limit is momentary: one short wait beats failing the patient's photo.
+      const out = await ask(model, base, key, image).catch(async (err) => {
+        if (!/ 429:/.test(err instanceof Error ? err.message : '')) throw err;
+        await new Promise((r) => setTimeout(r, 2500));
+        return ask(model, base, key, image);
+      });
+      if (working !== c) { working = c; console.info('vision: using', c); }
+      return out;
+    } catch (err) {
+      last = err;
+      console.warn('vision: candidate failed', c, err instanceof Error ? err.message.slice(0, 120) : err);
+    }
   }
-  const qwenKey = process.env.DASHSCOPE_API_KEY;
-  if (!qwenKey) throw new Error('no vision model configured');
-  return ask(process.env.MODEL_VISION_FALLBACK ?? 'qwen-vl-max', process.env.DASHSCOPE_BASE_URL ?? 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1', qwenKey, image);
+  throw last;
 }
 
 /** Pure: turn the model's JSON into a reading we are willing to show the patient. */
