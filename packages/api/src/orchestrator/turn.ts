@@ -266,7 +266,14 @@ export async function respond(args: {
 /** Returns the id of the reading logged this turn, if any. */
 async function persistExtraction(patientId: string, turnId: string, ex: Extraction): Promise<string | null> {
   let readingId: string | null = null;
-  if (ex.glucose_mg_dl !== null) {
+  // Referring back to a number ("since my sugar was 250") is not a new
+  // reading. Triage still sees the value; only the duplicate row is skipped.
+  const repeat = ex.glucose_mg_dl === null ? undefined : await one<{ id: string }>(
+    `SELECT id FROM readings WHERE patient_id=$1 AND mg_dl=$2 AND taken_at > now() - interval '60 minutes' LIMIT 1`,
+    [patientId, ex.glucose_mg_dl],
+  );
+  if (repeat) readingId = repeat.id;
+  else if (ex.glucose_mg_dl !== null) {
     const row = await one<{ id: string }>(
       `INSERT INTO readings (patient_id, turn_id, mg_dl, context) VALUES ($1,$2,$3,$4) RETURNING id`,
       [patientId, turnId, ex.glucose_mg_dl, ex.glucose_context ?? 'random'],
@@ -404,11 +411,17 @@ async function askFollowUp(a: {
     const oneQuestion = (out.match(/[?؟]/g) ?? []).length === 1;
     const scriptOk = a.lang === 'en' ? /[A-Za-z]/.test(out) : isUrduScript(out);
     const numberOk = a.extraction.glucose_mg_dl === null || out.includes(String(a.extraction.glucose_mg_dl));
-    return oneQuestion && scriptOk && numberOk && out.length <= 320 ? out : fallback;
+    if (oneQuestion && scriptOk && numberOk && out.length <= 320) return out;
+    console.warn('follow-up: fixed wording used', { oneQuestion, scriptOk, numberOk, length: out.length, sample: out.slice(0, 120) });
+    return fallback;
   } catch {
     return fallback;
   }
 }
+
+/** Stated per medicine so the model cannot generalise "these can cause lows" across a list. */
+const lowsLine = (causesLows: boolean) =>
+  causesLows ? 'CAN cause low sugar on its own' : 'does NOT cause low sugar on its own (only together with other diabetes medicines)';
 
 async function generateReply(a: {
   userTextUr: string;
@@ -465,11 +478,11 @@ async function generateReply(a: {
   const theirs = new Set(known.flatMap((k) => k.medicines.map((m) => m.id)));
   const facts = known.flatMap((k) => k.medicines.map((m) => {
     const c = card(k.asNamed, m, lang);
-    return `${m.generic} (their "${k.asNamed}"): for — ${c.purpose} | how — ${c.take} | side effects — ${c.sideEffects} | missed dose — ${c.missedDose} | warning — ${c.warning}`;
+    return `${m.generic} (their "${k.asNamed}"): for — ${c.purpose} | how — ${c.take} | side effects — ${c.sideEffects} | missed dose — ${c.missedDose} | warning — ${c.warning} | ${lowsLine(m.causesLows)}`;
   }));
   for (const m of identify(a.userTextUr).filter((m) => !theirs.has(m.id))) {
     const c = card(m.generic, m, lang);
-    facts.push(`${m.generic} — NOT on their list, general information only: for — ${c.purpose} | how — ${c.take} | side effects — ${c.sideEffects}`);
+    facts.push(`${m.generic} — NOT on their list, general information only; describe it neutrally, never call it good or better, never suggest they ask to start it: for — ${c.purpose} | side effects — ${c.sideEffects} | ${lowsLine(m.causesLows)}`);
   }
   if (facts.length) ctx.push('MEDICINE FACTS (sourced — explain only from these):\n- ' + facts.join('\n- '));
   if (checks.length) {
