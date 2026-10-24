@@ -155,7 +155,7 @@ export async function respond(args: {
   ]);
 
   // 3. persist extracted values with provenance
-  const readingId = await persistExtraction(patientId, patientTurnId, extraction);
+  const { readingId, repeat: repeatReading } = await persistExtraction(patientId, patientTurnId, extraction);
 
   // 3b. fold this turn into the follow-up intake, or open one
   let intake: Intake | null = null;
@@ -215,8 +215,10 @@ export async function respond(args: {
     const name = ((lang === 'en' ? fact(facts, 'name_en') : undefined) ?? fact(facts, 'name') ?? caregiverPhone?.display_name ?? undefined) as string | undefined;
     const amber = result.findings.filter((f) => f.severity === 'amber');
     for (const f of amber) {
-      // During an intake the same reading is re-triaged every turn; alert once.
+      // During an intake the same reading is re-triaged every turn, and a
+      // patient referring back to a number is not a new event; alert once.
       if (intake?.alerted.includes(f.ruleId)) continue;
+      if (repeatReading && f.ruleId === 'AMBER_SINGLE_HIGH') continue;
       alertId = await insertAlert(patientId, patientTurnId, f);
       intake?.alerted.push(f.ruleId);
     }
@@ -263,8 +265,8 @@ export async function respond(args: {
   };
 }
 
-/** Returns the id of the reading logged this turn, if any. */
-async function persistExtraction(patientId: string, turnId: string, ex: Extraction): Promise<string | null> {
+/** The reading this turn refers to, and whether it was one already logged in the last hour. */
+async function persistExtraction(patientId: string, turnId: string, ex: Extraction): Promise<{ readingId: string | null; repeat: boolean }> {
   let readingId: string | null = null;
   // Referring back to a number ("since my sugar was 250") is not a new
   // reading. Triage still sees the value; only the duplicate row is skipped.
@@ -308,7 +310,7 @@ async function persistExtraction(patientId: string, turnId: string, ex: Extracti
       [patientId, turnId],
     );
   }
-  return readingId;
+  return { readingId, repeat: !!repeat };
 }
 
 async function insertAlert(patientId: string, turnId: string, f: Finding): Promise<string> {
